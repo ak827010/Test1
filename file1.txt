@@ -225,3 +225,207 @@ Fetch Booking Details	GET	/api/booking/AB20251234	{ "ReferenceNumber": "AB202512
 ✔ Microservice Communication – Calls Fare Service before booking.
 ✔ Error Handling – Proper exceptions for booking failures.
 ✔ Database Integration – Uses SQL Server for storing booking and passenger details.
+
+
+
+
+🚀 Implementing Check-in Service (Microservice)
+The Check-in Service handles:
+✔ Web Check-in for a Booking
+✔ Assigning Seats Automatically
+✔ Generating a Check-in ID
+✔ Fetching Check-in Details Using Reference Number
+
+Since this is a microservice, it will:
+
+Call Booking Service to validate the reference number.
+Assign seats to passengers.
+Store check-in details in SQL Server.
+✅ Update ICheckinRepository.cs
+We need methods to:
+1️⃣ Perform check-in
+2️⃣ Fetch check-in details using reference number
+
+csharp
+Copy
+Edit
+public interface ICheckinRepository
+{
+    Task<string> PerformCheckinAsync(string referenceNumber);
+    Task<CheckinDetails> GetCheckinDetailsAsync(string referenceNumber);
+}
+✅ Implement CheckinRepository.cs
+This repository:
+
+Calls Booking Service to validate the booking.
+Assigns seat numbers randomly.
+Stores check-in details in the database.
+csharp
+Copy
+Edit
+public class CheckinRepository : ICheckinRepository
+{
+    private readonly CheckinDbContext _context;
+    private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
+
+    public CheckinRepository(CheckinDbContext context, HttpClient httpClient, IConfiguration configuration)
+    {
+        _context = context;
+        _httpClient = httpClient;
+        _configuration = configuration;
+    }
+
+    public async Task<string> PerformCheckinAsync(string referenceNumber)
+    {
+        try
+        {
+            // Call Booking Service to validate reference number
+            string bookingServiceUrl = _configuration["BookingServiceUrl"] + $"/api/booking/{referenceNumber}";
+            var bookingResponse = await _httpClient.GetAsync(bookingServiceUrl);
+            if (!bookingResponse.IsSuccessStatusCode)
+                throw new Exception("Invalid booking reference number.");
+
+            // Generate a unique check-in ID
+            string checkinId = "CHK" + new Random().Next(10000, 99999);
+
+            // Generate seat numbers randomly
+            var assignedSeats = new List<string>();
+            Random random = new Random();
+            int totalPassengers = random.Next(1, 6); // Assume a max of 5 passengers per booking
+            for (int i = 0; i < totalPassengers; i++)
+            {
+                assignedSeats.Add("A" + random.Next(1, 50)); // Assign seats like A12, B7
+            }
+
+            // Save check-in details
+            var checkin = new Checkin
+            {
+                CheckinId = checkinId,
+                ReferenceNumber = referenceNumber,
+                AssignedSeats = string.Join(",", assignedSeats)
+            };
+
+            _context.Checkins.Add(checkin);
+            await _context.SaveChangesAsync();
+            return checkinId;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Check-in failed: " + ex.Message);
+        }
+    }
+
+    public async Task<CheckinDetails> GetCheckinDetailsAsync(string referenceNumber)
+    {
+        try
+        {
+            var checkin = await _context.Checkins
+                .FirstOrDefaultAsync(c => c.ReferenceNumber == referenceNumber);
+
+            if (checkin == null)
+                throw new Exception("Check-in details not found.");
+
+            return new CheckinDetails
+            {
+                CheckinId = checkin.CheckinId,
+                ReferenceNumber = checkin.ReferenceNumber,
+                AssignedSeats = checkin.AssignedSeats.Split(',')
+            };
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error fetching check-in details: " + ex.Message);
+        }
+    }
+}
+✅ Implement CheckinController.cs
+The controller exposes APIs for:
+✔ Performing Web Check-in
+✔ Fetching Check-in Details by Reference Number
+
+csharp
+Copy
+Edit
+[Route("api/[controller]")]
+[ApiController]
+public class CheckinController : ControllerBase
+{
+    private readonly ICheckinRepository _checkinRepository;
+
+    public CheckinController(ICheckinRepository checkinRepository)
+    {
+        _checkinRepository = checkinRepository;
+    }
+
+    // 🔹 Perform Check-in
+    [HttpPost("{referenceNumber}")]
+    public async Task<IActionResult> PerformCheckin(string referenceNumber)
+    {
+        try
+        {
+            string checkinId = await _checkinRepository.PerformCheckinAsync(referenceNumber);
+            return Ok(new { CheckinId = checkinId, Message = "Check-in successful!" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, "Error during check-in: " + ex.Message);
+        }
+    }
+
+    // 🔹 Fetch Check-in Details
+    [HttpGet("{referenceNumber}")]
+    public async Task<IActionResult> GetCheckinDetails(string referenceNumber)
+    {
+        try
+        {
+            var checkinDetails = await _checkinRepository.GetCheckinDetailsAsync(referenceNumber);
+            return Ok(checkinDetails);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, "Error fetching check-in details: " + ex.Message);
+        }
+    }
+}
+🔹 Database Models
+We need one table:
+1️⃣ Checkin Table – Stores check-in details for each booking.
+
+csharp
+Copy
+Edit
+public class Checkin
+{
+    [Key]
+    public int Id { get; set; }
+    public string CheckinId { get; set; }
+    public string ReferenceNumber { get; set; }
+    public string AssignedSeats { get; set; } // Stored as "A12,B7,C4"
+}
+🔹 Database Context (CheckinDbContext.cs)
+csharp
+Copy
+Edit
+public class CheckinDbContext : DbContext
+{
+    public CheckinDbContext(DbContextOptions<CheckinDbContext> options) : base(options) { }
+
+    public DbSet<Checkin> Checkins { get; set; }
+}
+🔹 Configurations (appsettings.json)
+Since we need to call Booking Service, we store its URL in appsettings.json.
+
+json
+Copy
+Edit
+{
+  "ConnectionStrings": {
+    "CheckinDb": "Server=(local)\\sqlexpress;Database=CheckinDB;Trusted_Connection=True;"
+  },
+  "BookingServiceUrl": "http://localhost:5004"
+}
+✅ Testing the API
+Action	Method	Endpoint	Response
+Perform Check-in	POST	/api/checkin/AB20251234	{ "CheckinId": "CHK12345", "Message": "Check-in successful!" }
+Fetch Check-in Details	GET	/api/checkin/AB20251234	{ "CheckinId": "CHK12345", "ReferenceNumber": "AB20251234", "AssignedSeats": ["A12", "B7"] }
