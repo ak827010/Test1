@@ -1,0 +1,235 @@
+Here is the Booking Service implementation with all the required functionalities:
+
+✅ Handles Booking & Passenger Details
+✅ Calls City Service for Airport Charges
+✅ Calls Fare Service for Base Fare & Convenience Charge
+✅ Calls Flight Service to Decrease Available Seats
+✅ Generates Booking Reference Number
+✅ Uses DTOs for Clean API Interaction
+✅ Exception Handling in Methods
+
+1️⃣ Models (Booking.cs & Passenger.cs)
+csharp
+Copy
+Edit
+public class Booking
+{
+    public int Id { get; set; }
+    public string ReferenceNumber { get; set; }
+    public int FlightId { get; set; }
+    public decimal TotalFare { get; set; }
+    public string Status { get; set; }  // Confirmed, Checked-in, Cancelled
+    public bool CheckedIn { get; set; }
+    public string? CheckInId { get; set; }
+    public string? SeatNumber { get; set; }
+    public List<Passenger> Passengers { get; set; } = new List<Passenger>();
+}
+
+public class Passenger
+{
+    public int Id { get; set; }
+    public int BookingId { get; set; }
+    public string Name { get; set; }
+    public string Email { get; set; }
+    public string PassportNumber { get; set; }
+}
+2️⃣ DTOs (BookingRequestDTO.cs, BookingResponseDTO.cs)
+csharp
+Copy
+Edit
+public class BookingRequestDTO
+{
+    public int FlightId { get; set; }
+    public List<PassengerDTO> Passengers { get; set; }
+}
+
+public class PassengerDTO
+{
+    public string Name { get; set; }
+    public string Email { get; set; }
+    public string PassportNumber { get; set; }
+}
+
+public class BookingResponseDTO
+{
+    public string ReferenceNumber { get; set; }
+    public decimal TotalFare { get; set; }
+    public List<PassengerDTO> Passengers { get; set; }
+}
+3️⃣ Repository (IBookingRepository.cs, BookingRepository.cs)
+IBookingRepository.cs
+csharp
+Copy
+Edit
+public interface IBookingRepository
+{
+    Task<string> BookFlightAsync(BookingRequestDTO request);
+    Task<BookingResponseDTO> GetBookingDetailsAsync(string referenceNumber);
+}
+BookingRepository.cs
+csharp
+Copy
+Edit
+public class BookingRepository : IBookingRepository
+{
+    private readonly BookingDbContext _context;
+    private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
+
+    public BookingRepository(BookingDbContext context, HttpClient httpClient, IConfiguration configuration)
+    {
+        _context = context;
+        _httpClient = httpClient;
+        _configuration = configuration;
+    }
+
+    public async Task<string> BookFlightAsync(BookingRequestDTO request)
+    {
+        try
+        {
+            // Generate a unique booking reference number
+            string referenceNumber = "AB2025" + new Random().Next(1000, 9999);
+
+            // Fetch base fare & convenience charge from Fare Service
+            string fareServiceUrl = _configuration["ServiceUrls:FareService"];
+            var fareResponse = await _httpClient.GetFromJsonAsync<decimal>($"{fareServiceUrl}/api/fare/{request.FlightId}");
+
+            if (fareResponse == 0)
+                throw new Exception("Invalid fare response from Fare Service.");
+
+            // Fetch airport charges from City Service
+            string cityServiceUrl = _configuration["ServiceUrls:CityService"];
+            var airportCharge = await _httpClient.GetFromJsonAsync<decimal>($"{cityServiceUrl}/api/city/airportcharge/{request.FlightId}");
+
+            if (airportCharge == 0)
+                throw new Exception("Invalid airport charge from City Service.");
+
+            // Calculate total fare
+            decimal totalFare = fareResponse + airportCharge;
+
+            // Save Booking
+            var booking = new Booking
+            {
+                ReferenceNumber = referenceNumber,
+                FlightId = request.FlightId,
+                TotalFare = totalFare,
+                Status = "Confirmed",
+                Passengers = request.Passengers.Select(p => new Passenger
+                {
+                    Name = p.Name,
+                    Email = p.Email,
+                    PassportNumber = p.PassportNumber
+                }).ToList()
+            };
+
+            _context.Bookings.Add(booking);
+            await _context.SaveChangesAsync();
+
+            // Decrease available seats in Flight Service
+            string flightServiceUrl = _configuration["ServiceUrls:FlightService"];
+            var updateSeatsResponse = await _httpClient.PutAsJsonAsync($"{flightServiceUrl}/api/flights/update-seats/{request.FlightId}", new { SeatsToReduce = request.Passengers.Count });
+
+            if (!updateSeatsResponse.IsSuccessStatusCode)
+                throw new Exception("Failed to update available seats in Flight Service.");
+
+            return referenceNumber;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error while booking flight: " + ex.Message);
+        }
+    }
+
+    public async Task<BookingResponseDTO> GetBookingDetailsAsync(string referenceNumber)
+    {
+        try
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Passengers)
+                .FirstOrDefaultAsync(b => b.ReferenceNumber == referenceNumber);
+
+            if (booking == null)
+                throw new Exception("Booking not found.");
+
+            return new BookingResponseDTO
+            {
+                ReferenceNumber = booking.ReferenceNumber,
+                TotalFare = booking.TotalFare,
+                Passengers = booking.Passengers.Select(p => new PassengerDTO
+                {
+                    Name = p.Name,
+                    Email = p.Email,
+                    PassportNumber = p.PassportNumber
+                }).ToList()
+            };
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error retrieving booking details: " + ex.Message);
+        }
+    }
+}
+4️⃣ Controller (BookingController.cs)
+csharp
+Copy
+Edit
+[Route("api/[controller]")]
+[ApiController]
+public class BookingController : ControllerBase
+{
+    private readonly IBookingRepository _bookingRepository;
+
+    public BookingController(IBookingRepository bookingRepository)
+    {
+        _bookingRepository = bookingRepository;
+    }
+
+    // BOOK A FLIGHT
+    [HttpPost("book")]
+    public async Task<IActionResult> BookFlight([FromBody] BookingRequestDTO request)
+    {
+        try
+        {
+            string referenceNumber = await _bookingRepository.BookFlightAsync(request);
+            return Ok(new { Message = "Booking successful", ReferenceNumber = referenceNumber });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // GET BOOKING DETAILS BY REFERENCE NUMBER
+    [HttpGet("{referenceNumber}")]
+    public async Task<IActionResult> GetBookingDetails(string referenceNumber)
+    {
+        try
+        {
+            var bookingDetails = await _bookingRepository.GetBookingDetailsAsync(referenceNumber);
+            return Ok(bookingDetails);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+}
+5️⃣ Configuration (appsettings.json)
+json
+Copy
+Edit
+"ServiceUrls": {
+  "FareService": "http://localhost:5002",
+  "CityService": "http://localhost:5003",
+  "FlightService": "http://localhost:5004"
+}
+How the Process Works
+1️⃣ User selects a flight and clicks Book
+2️⃣ Booking Service calls Fare Service to get the base fare & convenience charge
+3️⃣ Booking Service calls City Service to get the airport charge
+4️⃣ Total fare is calculated
+5️⃣ Passenger details are saved in the Passengers Table
+6️⃣ Booking details are saved in the Bookings Table
+7️⃣ Booking Service calls Flight Service to reduce available seats
+8️⃣ Booking Reference Number is generated and returned
+9️⃣ User can later fetch booking details using the reference number
