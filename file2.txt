@@ -1523,3 +1523,201 @@ Layer	Responsibility
 Controller	Handles HTTP requests and responses. Calls Process Layer.
 Process Layer	Calls external APIs, performs calculations, then calls Repository.
 Repository	Handles database operations (CRUD).
+
+
+1️⃣ Create IBookingProcess Interface
+csharp
+Copy
+Edit
+public interface IBookingProcess
+{
+    Task<string> BookFlightAsync(BookingRequestDTO request);
+    Task<BookingResponseDTO> GetBookingDetailsAsync(string referenceNumber);
+}
+2️⃣ Implement BookingProcess Class
+csharp
+Copy
+Edit
+public class BookingProcess : IBookingProcess
+{
+    private readonly IBookingRepository _bookingRepository;
+    private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
+
+    public BookingProcess(IBookingRepository bookingRepository, HttpClient httpClient, IConfiguration configuration)
+    {
+        _bookingRepository = bookingRepository;
+        _httpClient = httpClient;
+        _configuration = configuration;
+    }
+
+    public async Task<string> BookFlightAsync(BookingRequestDTO request)
+    {
+        try
+        {
+            // Fetch base fare from Fare Service
+            string fareServiceUrl = _configuration["ServiceUrls:FareService"];
+            var fareResponse = await _httpClient.GetFromJsonAsync<decimal>($"{fareServiceUrl}/api/fare/{request.FlightId}");
+
+            if (fareResponse == 0)
+                throw new Exception("Invalid fare response from Fare Service.");
+
+            // Fetch airport charges from City Service
+            string cityServiceUrl = _configuration["ServiceUrls:CityService"];
+            var airportCharge = await _httpClient.GetFromJsonAsync<decimal>($"{cityServiceUrl}/api/city/airportcharge/{request.FlightId}");
+
+            if (airportCharge == 0)
+                throw new Exception("Invalid airport charge from City Service.");
+
+            // Calculate total fare
+            decimal totalFare = fareResponse + airportCharge;
+
+            // Call Repository to book flight
+            string referenceNumber = await _bookingRepository.BookFlightAsync(request, totalFare);
+
+            // Decrease available seats in Flight Service
+            string flightServiceUrl = _configuration["ServiceUrls:FlightService"];
+            var updateSeatsResponse = await _httpClient.PutAsJsonAsync($"{flightServiceUrl}/api/flights/update-seats/{request.FlightId}", 
+                new { SeatsToReduce = request.Passengers.Count });
+
+            if (!updateSeatsResponse.IsSuccessStatusCode)
+                throw new Exception("Failed to update available seats in Flight Service.");
+
+            return referenceNumber;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error while processing booking: " + ex.Message);
+        }
+    }
+
+    public async Task<BookingResponseDTO> GetBookingDetailsAsync(string referenceNumber)
+    {
+        return await _bookingRepository.GetBookingDetailsAsync(referenceNumber);
+    }
+}
+3️⃣ Modify IBookingRepository Interface
+csharp
+Copy
+Edit
+public interface IBookingRepository
+{
+    Task<string> BookFlightAsync(BookingRequestDTO request, decimal totalFare);
+    Task<BookingResponseDTO> GetBookingDetailsAsync(string referenceNumber);
+}
+4️⃣ Modify BookingRepository
+csharp
+Copy
+Edit
+public class BookingRepository : IBookingRepository
+{
+    private readonly BookingDbContext _context;
+
+    public BookingRepository(BookingDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<string> BookFlightAsync(BookingRequestDTO request, decimal totalFare)
+    {
+        try
+        {
+            string referenceNumber = "AB2025" + new Random().Next(1000, 9999);
+
+            var booking = new Booking
+            {
+                ReferenceNumber = referenceNumber,
+                FlightId = request.FlightId,
+                TotalFare = totalFare,
+                Status = "Confirmed",
+                Passengers = request.Passengers.Select(p => new Passenger
+                {
+                    Name = p.Name,
+                    Email = p.Email,
+                    PassportNumber = p.PassportNumber
+                }).ToList()
+            };
+
+            _context.Bookings.Add(booking);
+            await _context.SaveChangesAsync();
+
+            return referenceNumber;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error while saving booking: " + ex.Message);
+        }
+    }
+
+    public async Task<BookingResponseDTO> GetBookingDetailsAsync(string referenceNumber)
+    {
+        var booking = await _context.Bookings
+            .Include(b => b.Passengers)
+            .FirstOrDefaultAsync(b => b.ReferenceNumber == referenceNumber);
+
+        if (booking == null)
+            throw new Exception("Booking not found.");
+
+        return new BookingResponseDTO
+        {
+            ReferenceNumber = booking.ReferenceNumber,
+            TotalFare = booking.TotalFare,
+            Passengers = booking.Passengers.Select(p => new PassengerDTO
+            {
+                Name = p.Name,
+                Email = p.Email,
+                PassportNumber = p.PassportNumber
+            }).ToList()
+        };
+    }
+}
+5️⃣ Modify BookingController to Use IBookingProcess
+csharp
+Copy
+Edit
+[Route("api/[controller]")]
+[ApiController]
+public class BookingController : ControllerBase
+{
+    private readonly IBookingProcess _bookingProcess;
+
+    public BookingController(IBookingProcess bookingProcess)
+    {
+        _bookingProcess = bookingProcess;
+    }
+
+    [HttpPost("book")]
+    public async Task<IActionResult> BookFlight([FromBody] BookingRequestDTO request)
+    {
+        try
+        {
+            string referenceNumber = await _bookingProcess.BookFlightAsync(request);
+            return Ok(new { Message = "Booking successful", ReferenceNumber = referenceNumber });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    [HttpGet("{referenceNumber}")]
+    public async Task<IActionResult> GetBookingDetails(string referenceNumber)
+    {
+        try
+        {
+            var bookingDetails = await _bookingProcess.GetBookingDetailsAsync(referenceNumber);
+            return Ok(bookingDetails);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+}
+6️⃣ Register Dependencies in Program.cs
+csharp
+Copy
+Edit
+builder.Services.AddScoped<IBookingProcess, BookingProcess>();
+builder.Services.AddScoped<IBookingRepository, BookingRepository>();
+builder.Services.AddHttpClient(); // Required for API calls
