@@ -233,3 +233,166 @@ How the Process Works
 7️⃣ Booking Service calls Flight Service to reduce available seats
 8️⃣ Booking Reference Number is generated and returned
 9️⃣ User can later fetch booking details using the reference number
+
+
+
+Check-in Service Implementation ✈️
+✅ Handles Passenger Check-in
+✅ Generates Check-in ID & Assigns Seat
+✅ Calls Booking Service to Update Check-in Status
+✅ Microservices Approach with API Calls
+✅ Exception Handling in Methods
+
+1️⃣ Models (CheckIn.cs)
+csharp
+Copy
+Edit
+public class CheckIn
+{
+    public int Id { get; set; }
+    public string CheckInId { get; set; }
+    public string ReferenceNumber { get; set; }
+    public string SeatNumber { get; set; }
+    public DateTime CheckInTime { get; set; }
+}
+2️⃣ DTOs (CheckInRequestDTO.cs, CheckInResponseDTO.cs)
+csharp
+Copy
+Edit
+public class CheckInRequestDTO
+{
+    public string ReferenceNumber { get; set; }
+}
+
+public class CheckInResponseDTO
+{
+    public string CheckInId { get; set; }
+    public string SeatNumber { get; set; }
+    public DateTime CheckInTime { get; set; }
+}
+3️⃣ Repository (ICheckInRepository.cs, CheckInRepository.cs)
+ICheckInRepository.cs
+csharp
+Copy
+Edit
+public interface ICheckInRepository
+{
+    Task<CheckInResponseDTO> PerformCheckInAsync(CheckInRequestDTO request);
+}
+CheckInRepository.cs
+csharp
+Copy
+Edit
+public class CheckInRepository : ICheckInRepository
+{
+    private readonly CheckInDbContext _context;
+    private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
+
+    public CheckInRepository(CheckInDbContext context, HttpClient httpClient, IConfiguration configuration)
+    {
+        _context = context;
+        _httpClient = httpClient;
+        _configuration = configuration;
+    }
+
+    public async Task<CheckInResponseDTO> PerformCheckInAsync(CheckInRequestDTO request)
+    {
+        try
+        {
+            // Fetch booking details from Booking Service
+            string bookingServiceUrl = _configuration["ServiceUrls:BookingService"];
+            var bookingResponse = await _httpClient.GetFromJsonAsync<BookingResponseDTO>($"{bookingServiceUrl}/api/booking/{request.ReferenceNumber}");
+
+            if (bookingResponse == null)
+                throw new Exception("Invalid reference number or booking not found.");
+
+            // Generate a Check-in ID
+            string checkInId = "CHK" + new Random().Next(10000, 99999);
+
+            // Assign a random seat
+            string seatNumber = GenerateSeatNumber();
+
+            // Save Check-in Details
+            var checkIn = new CheckIn
+            {
+                CheckInId = checkInId,
+                ReferenceNumber = request.ReferenceNumber,
+                SeatNumber = seatNumber,
+                CheckInTime = DateTime.UtcNow
+            };
+
+            _context.CheckIns.Add(checkIn);
+            await _context.SaveChangesAsync();
+
+            // Update booking status in Booking Service
+            var updateCheckInResponse = await _httpClient.PutAsJsonAsync($"{bookingServiceUrl}/api/booking/update-checkin/{request.ReferenceNumber}", new { CheckInId = checkInId, SeatNumber = seatNumber });
+
+            if (!updateCheckInResponse.IsSuccessStatusCode)
+                throw new Exception("Failed to update booking status in Booking Service.");
+
+            return new CheckInResponseDTO
+            {
+                CheckInId = checkInId,
+                SeatNumber = seatNumber,
+                CheckInTime = checkIn.CheckInTime
+            };
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error during check-in: " + ex.Message);
+        }
+    }
+
+    private string GenerateSeatNumber()
+    {
+        Random rnd = new Random();
+        char row = (char)('A' + rnd.Next(0, 6)); // Rows A to F
+        int seat = rnd.Next(1, 30); // 1 to 30 seats per row
+        return $"{row}{seat}";
+    }
+}
+4️⃣ Controller (CheckInController.cs)
+csharp
+Copy
+Edit
+[Route("api/[controller]")]
+[ApiController]
+public class CheckInController : ControllerBase
+{
+    private readonly ICheckInRepository _checkInRepository;
+
+    public CheckInController(ICheckInRepository checkInRepository)
+    {
+        _checkInRepository = checkInRepository;
+    }
+
+    // PERFORM CHECK-IN
+    [HttpPost("perform")]
+    public async Task<IActionResult> PerformCheckIn([FromBody] CheckInRequestDTO request)
+    {
+        try
+        {
+            var checkInResponse = await _checkInRepository.PerformCheckInAsync(request);
+            return Ok(checkInResponse);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+}
+5️⃣ Configuration (appsettings.json)
+json
+Copy
+Edit
+"ServiceUrls": {
+  "BookingService": "http://localhost:5005"
+}
+How the Process Works
+1️⃣ User enters Booking Reference Number and clicks Check-in
+2️⃣ Check-in Service calls Booking Service to validate the reference number
+3️⃣ Check-in Service generates a Check-in ID and assigns a Seat Number
+4️⃣ Check-in details are saved in the Check-ins Table
+5️⃣ Check-in Service calls Booking Service to update Check-in Status
+6️⃣ User receives Check-in ID & Seat Number
