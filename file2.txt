@@ -396,3 +396,1130 @@ How the Process Works
 4️⃣ Check-in details are saved in the Check-ins Table
 5️⃣ Check-in Service calls Booking Service to update Check-in Status
 6️⃣ User receives Check-in ID & Seat Number
+
+
+
+City Service Implementation 🌆✈️
+✅ Manages Cities & Airport Charges
+✅ Admin Privileges for Add, Update, Delete
+✅ Fetch Cities for Flight Search (by Name or Code)
+✅ Exception Handling in Methods
+
+1️⃣ Models (City.cs)
+csharp
+Copy
+Edit
+public class City
+{
+    public int CityId { get; set; }
+    public string CityCode { get; set; } // Example: BLR for Bengaluru
+    public string CityName { get; set; } // Example: Bengaluru
+    public string State { get; set; } // Example: Karnataka
+    public decimal AirportCharge { get; set; } // Airport service charge
+}
+2️⃣ Repository (ICityRepository.cs, CityRepository.cs)
+ICityRepository.cs
+csharp
+Copy
+Edit
+public interface ICityRepository
+{
+    Task<List<City>> GetCitiesAsync();
+    Task<List<City>> SearchCitiesAsync(string searchTerm);
+    Task<City> GetCityByCodeAsync(string cityCode);
+    Task<City> GetCityByIdAsync(int cityId);
+    Task AddCityAsync(City city);
+    Task UpdateCityAsync(City city);
+    Task DeleteCityAsync(int cityId);
+}
+CityRepository.cs
+csharp
+Copy
+Edit
+public class CityRepository : ICityRepository
+{
+    private readonly CityDbContext _context;
+
+    public CityRepository(CityDbContext context)
+    {
+        _context = context;
+    }
+
+    // GET ALL CITIES
+    public async Task<List<City>> GetCitiesAsync()
+    {
+        try
+        {
+            return await _context.Cities.ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error fetching cities: " + ex.Message);
+        }
+    }
+
+    // SEARCH CITIES BY NAME OR CODE
+    public async Task<List<City>> SearchCitiesAsync(string searchTerm)
+    {
+        try
+        {
+            return await _context.Cities
+                .Where(c => c.CityName.Contains(searchTerm) || c.CityCode.Contains(searchTerm))
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error searching cities: " + ex.Message);
+        }
+    }
+
+    // GET CITY BY CODE
+    public async Task<City> GetCityByCodeAsync(string cityCode)
+    {
+        try
+        {
+            var city = await _context.Cities.FirstOrDefaultAsync(c => c.CityCode == cityCode);
+            if (city == null) throw new Exception("City not found.");
+            return city;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error fetching city by code: " + ex.Message);
+        }
+    }
+
+    // GET CITY BY ID
+    public async Task<City> GetCityByIdAsync(int cityId)
+    {
+        try
+        {
+            var city = await _context.Cities.FindAsync(cityId);
+            if (city == null) throw new Exception("City not found.");
+            return city;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error fetching city by ID: " + ex.Message);
+        }
+    }
+
+    // ADD NEW CITY (ADMIN ONLY)
+    public async Task AddCityAsync(City city)
+    {
+        try
+        {
+            await _context.Cities.AddAsync(city);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error adding city: " + ex.Message);
+        }
+    }
+
+    // UPDATE CITY (ADMIN ONLY)
+    public async Task UpdateCityAsync(City city)
+    {
+        try
+        {
+            _context.Cities.Update(city);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error updating city: " + ex.Message);
+        }
+    }
+
+    // DELETE CITY (ADMIN ONLY)
+    public async Task DeleteCityAsync(int cityId)
+    {
+        try
+        {
+            var city = await _context.Cities.FindAsync(cityId);
+            if (city == null) throw new Exception("City not found.");
+
+            _context.Cities.Remove(city);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error deleting city: " + ex.Message);
+        }
+    }
+}
+3️⃣ Controller (CityController.cs)
+csharp
+Copy
+Edit
+[Route("api/[controller]")]
+[ApiController]
+public class CityController : ControllerBase
+{
+    private readonly ICityRepository _cityRepository;
+
+    public CityController(ICityRepository cityRepository)
+    {
+        _cityRepository = cityRepository;
+    }
+
+    // GET ALL CITIES
+    [HttpGet("all")]
+    public async Task<IActionResult> GetCities()
+    {
+        try
+        {
+            var cities = await _cityRepository.GetCitiesAsync();
+            return Ok(cities);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // SEARCH CITIES (BY NAME OR CODE)
+    [HttpGet("search/{searchTerm}")]
+    public async Task<IActionResult> SearchCities(string searchTerm)
+    {
+        try
+        {
+            var cities = await _cityRepository.SearchCitiesAsync(searchTerm);
+            return Ok(cities);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // GET CITY BY CODE
+    [HttpGet("code/{cityCode}")]
+    public async Task<IActionResult> GetCityByCode(string cityCode)
+    {
+        try
+        {
+            var city = await _cityRepository.GetCityByCodeAsync(cityCode);
+            return Ok(city);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // ADD CITY (ADMIN ONLY)
+    [HttpPost("add")]
+    public async Task<IActionResult> AddCity([FromBody] City city)
+    {
+        try
+        {
+            await _cityRepository.AddCityAsync(city);
+            return StatusCode(201, new { Message = "City added successfully." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // UPDATE CITY (ADMIN ONLY)
+    [HttpPut("update")]
+    public async Task<IActionResult> UpdateCity([FromBody] City city)
+    {
+        try
+        {
+            await _cityRepository.UpdateCityAsync(city);
+            return Ok(new { Message = "City updated successfully." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // DELETE CITY (ADMIN ONLY)
+    [HttpDelete("delete/{cityId}")]
+    public async Task<IActionResult> DeleteCity(int cityId)
+    {
+        try
+        {
+            await _cityRepository.DeleteCityAsync(cityId);
+            return Ok(new { Message = "City deleted successfully." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+}
+4️⃣ Database Context (CityDbContext.cs)
+csharp
+Copy
+Edit
+public class CityDbContext : DbContext
+{
+    public CityDbContext(DbContextOptions<CityDbContext> options) : base(options) { }
+    public DbSet<City> Cities { get; set; }
+}
+5️⃣ Configuration (appsettings.json)
+json
+Copy
+Edit
+"ConnectionStrings": {
+  "CityDB": "Server=(local)\\sqlexpress;Database=CityDB;Trusted_Connection=True;TrustServerCertificate=True;"
+}
+6️⃣ How the API Works
+Functionality	API Endpoint	Method	Admin Required
+Get All Cities	/api/city/all	GET	❌
+Search Cities	/api/city/search/{searchTerm}	GET	❌
+Get City by Code	/api/city/code/{cityCode}	GET	❌
+Add City	/api/city/add	POST	✅
+Update City	/api/city/update	PUT	✅
+Delete City	/api/city/delete/{cityId}	DELETE	✅
+
+
+
+Flight Service Implementation ✈️🚀
+✅ Admin Privileges for Add, Update, Delete Flights
+✅ Fetch Available Flights Based on Cities & Date
+✅ Check Available Seats Before Booking
+✅ Exception Handling in Methods
+
+1️⃣ Model (Flight.cs)
+csharp
+Copy
+Edit
+public class Flight
+{
+    public int FlightId { get; set; }
+    public string FlightNumber { get; set; } // Example: AI-202
+    public string Airline { get; set; } // Example: Air India
+    public string FromCity { get; set; } // City Code (Example: BLR)
+    public string ToCity { get; set; } // City Code (Example: DEL)
+    public DateTime DepartureTime { get; set; }
+    public DateTime ArrivalTime { get; set; }
+    public int TotalSeats { get; set; }
+    public int AvailableSeats { get; set; }
+    public decimal BaseFare { get; set; } // Base Price of the Ticket
+}
+2️⃣ Repository (IFlightRepository.cs, FlightRepository.cs)
+IFlightRepository.cs
+csharp
+Copy
+Edit
+public interface IFlightRepository
+{
+    Task<List<Flight>> GetAvailableFlightsAsync(string fromCity, string toCity, DateTime departureDate);
+    Task<Flight> GetFlightByIdAsync(int flightId);
+    Task AddFlightAsync(Flight flight);
+    Task UpdateFlightAsync(Flight flight);
+    Task DeleteFlightAsync(int flightId);
+    Task<bool> ReduceAvailableSeatsAsync(int flightId, int seatsToBook);
+}
+FlightRepository.cs
+csharp
+Copy
+Edit
+public class FlightRepository : IFlightRepository
+{
+    private readonly FlightDbContext _context;
+
+    public FlightRepository(FlightDbContext context)
+    {
+        _context = context;
+    }
+
+    // GET AVAILABLE FLIGHTS BASED ON CITIES & DATE
+    public async Task<List<Flight>> GetAvailableFlightsAsync(string fromCity, string toCity, DateTime departureDate)
+    {
+        try
+        {
+            return await _context.Flights
+                .Where(f => f.FromCity == fromCity && f.ToCity == toCity 
+                            && f.DepartureTime.Date == departureDate.Date 
+                            && f.AvailableSeats > 0)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error fetching available flights: " + ex.Message);
+        }
+    }
+
+    // GET FLIGHT BY ID
+    public async Task<Flight> GetFlightByIdAsync(int flightId)
+    {
+        try
+        {
+            var flight = await _context.Flights.FindAsync(flightId);
+            if (flight == null) throw new Exception("Flight not found.");
+            return flight;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error fetching flight: " + ex.Message);
+        }
+    }
+
+    // ADD NEW FLIGHT (ADMIN ONLY)
+    public async Task AddFlightAsync(Flight flight)
+    {
+        try
+        {
+            await _context.Flights.AddAsync(flight);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error adding flight: " + ex.Message);
+        }
+    }
+
+    // UPDATE FLIGHT DETAILS (ADMIN ONLY)
+    public async Task UpdateFlightAsync(Flight flight)
+    {
+        try
+        {
+            _context.Flights.Update(flight);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error updating flight: " + ex.Message);
+        }
+    }
+
+    // DELETE FLIGHT (ADMIN ONLY)
+    public async Task DeleteFlightAsync(int flightId)
+    {
+        try
+        {
+            var flight = await _context.Flights.FindAsync(flightId);
+            if (flight == null) throw new Exception("Flight not found.");
+
+            _context.Flights.Remove(flight);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error deleting flight: " + ex.Message);
+        }
+    }
+
+    // REDUCE AVAILABLE SEATS AFTER SUCCESSFUL BOOKING
+    public async Task<bool> ReduceAvailableSeatsAsync(int flightId, int seatsToBook)
+    {
+        try
+        {
+            var flight = await _context.Flights.FindAsync(flightId);
+            if (flight == null || flight.AvailableSeats < seatsToBook)
+                return false; // Not enough seats available
+
+            flight.AvailableSeats -= seatsToBook;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error reducing available seats: " + ex.Message);
+        }
+    }
+}
+3️⃣ Controller (FlightController.cs)
+csharp
+Copy
+Edit
+[Route("api/[controller]")]
+[ApiController]
+public class FlightController : ControllerBase
+{
+    private readonly IFlightRepository _flightRepository;
+
+    public FlightController(IFlightRepository flightRepository)
+    {
+        _flightRepository = flightRepository;
+    }
+
+    // GET AVAILABLE FLIGHTS
+    [HttpGet("search")]
+    public async Task<IActionResult> GetAvailableFlights(string fromCity, string toCity, DateTime departureDate)
+    {
+        try
+        {
+            var flights = await _flightRepository.GetAvailableFlightsAsync(fromCity, toCity, departureDate);
+            return Ok(flights);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // GET FLIGHT BY ID
+    [HttpGet("id/{flightId}")]
+    public async Task<IActionResult> GetFlightById(int flightId)
+    {
+        try
+        {
+            var flight = await _flightRepository.GetFlightByIdAsync(flightId);
+            return Ok(flight);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // ADD FLIGHT (ADMIN ONLY)
+    [HttpPost("add")]
+    public async Task<IActionResult> AddFlight([FromBody] Flight flight)
+    {
+        try
+        {
+            await _flightRepository.AddFlightAsync(flight);
+            return StatusCode(201, new { Message = "Flight added successfully." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // UPDATE FLIGHT (ADMIN ONLY)
+    [HttpPut("update")]
+    public async Task<IActionResult> UpdateFlight([FromBody] Flight flight)
+    {
+        try
+        {
+            await _flightRepository.UpdateFlightAsync(flight);
+            return Ok(new { Message = "Flight updated successfully." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // DELETE FLIGHT (ADMIN ONLY)
+    [HttpDelete("delete/{flightId}")]
+    public async Task<IActionResult> DeleteFlight(int flightId)
+    {
+        try
+        {
+            await _flightRepository.DeleteFlightAsync(flightId);
+            return Ok(new { Message = "Flight deleted successfully." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+}
+4️⃣ Database Context (FlightDbContext.cs)
+csharp
+Copy
+Edit
+public class FlightDbContext : DbContext
+{
+    public FlightDbContext(DbContextOptions<FlightDbContext> options) : base(options) { }
+    public DbSet<Flight> Flights { get; set; }
+}
+5️⃣ Configuration (appsettings.json)
+json
+Copy
+Edit
+"ConnectionStrings": {
+  "FlightDB": "Server=(local)\\sqlexpress;Database=FlightDB;Trusted_Connection=True;TrustServerCertificate=True;"
+}
+6️⃣ How the API Works
+Functionality	API Endpoint	Method	Admin Required
+Search Flights	/api/flight/search?fromCity=BLR&toCity=DEL&departureDate=2025-03-15	GET	❌
+Get Flight by ID	/api/flight/id/{flightId}	GET	❌
+Add Flight	/api/flight/add	POST	✅
+Update Flight	/api/flight/update	PUT	✅
+Delete Flight	/api/flight/delete/{flightId}	DELETE	✅
+✅ Flight Service is now ready!
+
+Fare Service Implementation 💰✈️
+✅ Calculates Total Fare for a Booking
+✅ Fetches Base Fare & Convenience Charge
+✅ Calls City Service for Airport Charges
+✅ Handles Exceptions Gracefully
+
+1️⃣ Model (Fare.cs)
+csharp
+Copy
+Edit
+public class Fare
+{
+    public int FareId { get; set; }
+    public int FlightId { get; set; }
+    public decimal BaseFare { get; set; } // Base Price from Flight Service
+    public decimal ConvenienceCharge { get; set; } // Service Charge for Online Booking
+}
+2️⃣ DTO (FareCalculationRequest.cs, FareCalculationResponse.cs)
+csharp
+Copy
+Edit
+// Request DTO to Calculate Fare
+public class FareCalculationRequest
+{
+    public int FlightId { get; set; }
+    public string FromCity { get; set; }
+    public string ToCity { get; set; }
+}
+
+// Response DTO with Total Fare Breakdown
+public class FareCalculationResponse
+{
+    public decimal BaseFare { get; set; }
+    public decimal ConvenienceCharge { get; set; }
+    public decimal FromCityCharge { get; set; }
+    public decimal ToCityCharge { get; set; }
+    public decimal TotalFare { get; set; }
+}
+3️⃣ Repository (IFareRepository.cs, FareRepository.cs)
+IFareRepository.cs
+csharp
+Copy
+Edit
+public interface IFareRepository
+{
+    Task<Fare> GetFareByFlightIdAsync(int flightId);
+    Task<decimal> GetAirportChargeAsync(string cityCode); // Calls City Service
+    Task<FareCalculationResponse> CalculateTotalFareAsync(FareCalculationRequest request);
+}
+FareRepository.cs
+csharp
+Copy
+Edit
+public class FareRepository : IFareRepository
+{
+    private readonly FareDbContext _context;
+    private readonly HttpClient _httpClient; // For calling City Service
+
+    public FareRepository(FareDbContext context, HttpClient httpClient)
+    {
+        _context = context;
+        _httpClient = httpClient;
+    }
+
+    // FETCH FARE DETAILS BY FLIGHT ID
+    public async Task<Fare> GetFareByFlightIdAsync(int flightId)
+    {
+        try
+        {
+            var fare = await _context.Fares.FirstOrDefaultAsync(f => f.FlightId == flightId);
+            if (fare == null) throw new Exception("Fare details not found for this flight.");
+            return fare;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error fetching fare details: " + ex.Message);
+        }
+    }
+
+    // GET AIRPORT CHARGE FROM CITY SERVICE
+    public async Task<decimal> GetAirportChargeAsync(string cityCode)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"http://localhost:5001/api/city/airport-charge/{cityCode}");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<decimal>();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error fetching airport charge: " + ex.Message);
+        }
+    }
+
+    // CALCULATE TOTAL FARE
+    public async Task<FareCalculationResponse> CalculateTotalFareAsync(FareCalculationRequest request)
+    {
+        try
+        {
+            var fare = await GetFareByFlightIdAsync(request.FlightId);
+            decimal fromCityCharge = await GetAirportChargeAsync(request.FromCity);
+            decimal toCityCharge = await GetAirportChargeAsync(request.ToCity);
+
+            decimal totalFare = fare.BaseFare + fare.ConvenienceCharge + fromCityCharge + toCityCharge;
+
+            return new FareCalculationResponse
+            {
+                BaseFare = fare.BaseFare,
+                ConvenienceCharge = fare.ConvenienceCharge,
+                FromCityCharge = fromCityCharge,
+                ToCityCharge = toCityCharge,
+                TotalFare = totalFare
+            };
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error calculating total fare: " + ex.Message);
+        }
+    }
+}
+4️⃣ Controller (FareController.cs)
+csharp
+Copy
+Edit
+[Route("api/[controller]")]
+[ApiController]
+public class FareController : ControllerBase
+{
+    private readonly IFareRepository _fareRepository;
+
+    public FareController(IFareRepository fareRepository)
+    {
+        _fareRepository = fareRepository;
+    }
+
+    // GET FARE BY FLIGHT ID
+    [HttpGet("{flightId}")]
+    public async Task<IActionResult> GetFare(int flightId)
+    {
+        try
+        {
+            var fare = await _fareRepository.GetFareByFlightIdAsync(flightId);
+            return Ok(fare);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // CALCULATE TOTAL FARE
+    [HttpPost("calculate")]
+    public async Task<IActionResult> CalculateFare([FromBody] FareCalculationRequest request)
+    {
+        try
+        {
+            var fareDetails = await _fareRepository.CalculateTotalFareAsync(request);
+            return Ok(fareDetails);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+}
+5️⃣ Database Context (FareDbContext.cs)
+csharp
+Copy
+Edit
+public class FareDbContext : DbContext
+{
+    public FareDbContext(DbContextOptions<FareDbContext> options) : base(options) { }
+    public DbSet<Fare> Fares { get; set; }
+}
+6️⃣ Configuration (appsettings.json)
+json
+Copy
+Edit
+"ConnectionStrings": {
+  "FareDB": "Server=(local)\\sqlexpress;Database=FareDB;Trusted_Connection=True;TrustServerCertificate=True;"
+}
+7️⃣ How the API Works
+Functionality	API Endpoint	Method
+Get Fare by Flight ID	/api/fare/{flightId}	GET
+Calculate Total Fare	/api/fare/calculate	POST
+8️⃣ Example Calculation Flow
+1️⃣ User selects a flight → FlightId: 5
+2️⃣ Backend calls Fare Service for base fare & convenience charge
+3️⃣ Backend calls City Service for departure & arrival airport charges
+4️⃣ Total Fare is calculated & returned
+
+✅ Fare Service is now ready!
+
+
+
+🔹 Databases for Each Service
+City Service → CityDB
+Flight Service → FlightDB
+Fare Service → FareDB
+Booking Service → BookingDB
+Check-In Service → CheckInDB
+1️⃣ City Service – CityDB
+Stores details of cities and their airport charges.
+
+Create Database
+sql
+Copy
+Edit
+CREATE DATABASE CityDB;
+GO
+USE CityDB;
+GO
+Create Table
+sql
+Copy
+Edit
+CREATE TABLE Cities (
+    CityId INT IDENTITY(1,1) PRIMARY KEY,
+    CityCode NVARCHAR(10) UNIQUE NOT NULL,
+    CityName NVARCHAR(100) NOT NULL,
+    State NVARCHAR(100) NOT NULL,
+    AirportCharge DECIMAL(10,2) NOT NULL
+);
+Sample Data
+sql
+Copy
+Edit
+INSERT INTO Cities (CityCode, CityName, State, AirportCharge)
+VALUES ('BLR', 'Bangalore', 'Karnataka', 500),
+       ('DEL', 'Delhi', 'Delhi', 600),
+       ('MUM', 'Mumbai', 'Maharashtra', 550);
+2️⃣ Flight Service – FlightDB
+Manages flights and available seats.
+
+Create Database
+sql
+Copy
+Edit
+CREATE DATABASE FlightDB;
+GO
+USE FlightDB;
+GO
+Create Table
+sql
+Copy
+Edit
+CREATE TABLE Flights (
+    FlightId INT IDENTITY(1,1) PRIMARY KEY,
+    FlightNumber NVARCHAR(50) UNIQUE NOT NULL,
+    Airline NVARCHAR(100) NOT NULL,
+    SourceCityCode NVARCHAR(10) NOT NULL,
+    DestinationCityCode NVARCHAR(10) NOT NULL,
+    DepartureDateTime DATETIME NOT NULL,
+    ArrivalDateTime DATETIME NOT NULL,
+    TotalSeats INT NOT NULL,
+    AvailableSeats INT NOT NULL,
+    BaseFare DECIMAL(10,2) NOT NULL
+);
+Sample Data
+sql
+Copy
+Edit
+INSERT INTO Flights (FlightNumber, Airline, SourceCityCode, DestinationCityCode, DepartureDateTime, ArrivalDateTime, TotalSeats, AvailableSeats, BaseFare)
+VALUES ('AI-202', 'Air India', 'BLR', 'DEL', '2025-03-15 08:00:00', '2025-03-15 11:00:00', 180, 180, 4000);
+3️⃣ Fare Service – FareDB
+Stores fare details for flights.
+
+Create Database
+sql
+Copy
+Edit
+CREATE DATABASE FareDB;
+GO
+USE FareDB;
+GO
+Create Table
+sql
+Copy
+Edit
+CREATE TABLE Fares (
+    FareId INT IDENTITY(1,1) PRIMARY KEY,
+    FlightNumber NVARCHAR(50) NOT NULL,
+    BasePrice DECIMAL(10,2) NOT NULL,
+    ConvenienceCharge DECIMAL(10,2) NOT NULL
+);
+Sample Data
+sql
+Copy
+Edit
+INSERT INTO Fares (FlightNumber, BasePrice, ConvenienceCharge)
+VALUES ('AI-202', 4000, 200);
+4️⃣ Booking Service – BookingDB
+Manages bookings and passengers.
+
+Create Database
+sql
+Copy
+Edit
+CREATE DATABASE BookingDB;
+GO
+USE BookingDB;
+GO
+Create Tables
+sql
+Copy
+Edit
+CREATE TABLE Bookings (
+    BookingId INT IDENTITY(1,1) PRIMARY KEY,
+    ReferenceNumber NVARCHAR(20) UNIQUE NOT NULL,
+    FlightNumber NVARCHAR(50) NOT NULL,
+    TotalFare DECIMAL(10,2) NOT NULL,
+    BookingDate DATETIME DEFAULT GETDATE()
+);
+
+CREATE TABLE Passengers (
+    PassengerId INT IDENTITY(1,1) PRIMARY KEY,
+    BookingId INT NOT NULL,
+    FullName NVARCHAR(100) NOT NULL,
+    Email NVARCHAR(100) NOT NULL,
+    SeatNumber NVARCHAR(10) NULL,
+    FOREIGN KEY (BookingId) REFERENCES Bookings(BookingId) ON DELETE CASCADE
+);
+Sample Data
+sql
+Copy
+Edit
+INSERT INTO Bookings (ReferenceNumber, FlightNumber, TotalFare)
+VALUES ('AB20250001', 'AI-202', 4700);
+
+INSERT INTO Passengers (BookingId, FullName, Email, SeatNumber)
+VALUES (1, 'Ashirvad Kumar', 'ashirvad@example.com', '12A');
+5️⃣ Check-In Service – CheckInDB
+Stores check-in details.
+
+Create Database
+sql
+Copy
+Edit
+CREATE DATABASE CheckInDB;
+GO
+USE CheckInDB;
+GO
+Create Table
+sql
+Copy
+Edit
+CREATE TABLE CheckIns (
+    CheckInId INT IDENTITY(1,1) PRIMARY KEY,
+    PassengerId INT NOT NULL,
+    CheckInDate DATETIME DEFAULT GETDATE(),
+    SeatNumber NVARCHAR(10) NOT NULL
+);
+Sample Data
+sql
+Copy
+Edit
+INSERT INTO CheckIns (PassengerId, SeatNumber)
+VALUES (1, '12A');
+🔹 How Services Communicate Without Direct DB Access
+Each microservice will not directly query other databases. Instead, they will communicate using HTTP requests (REST API calls).
+
+Example: How Booking Service Calls Other Services
+To get Airport Charge → Call City Service API
+To get Flight Base Fare → Call Fare Service API
+To update Available Seats → Call Flight Service API
+Example API Calls: 1️⃣ Get Airport Charge from City Service
+
+bash
+Copy
+Edit
+GET http://localhost:5001/api/cities/BLR
+2️⃣ Get Base Fare from Fare Service
+
+bash
+Copy
+Edit
+GET http://localhost:5002/api/fares/AI-202
+3️⃣ Update Available Seats in Flight Service
+
+bash
+Copy
+Edit
+PUT http://localhost:5003/api/flights/update-seats
+🔹 Advantages of This Design
+✅ Independence: Each microservice has its own database, making it easier to scale.
+✅ Security: No direct cross-service database access, reducing risk.
+✅ Scalability: Each service can be optimized separately.
+✅ Easier Maintenance: Changes in one service do not affect others.
+
+🔹 Summary of Database Separation
+Service	Database	Tables	API Calls Required
+City Service	CityDB	Cities	Used by Booking & Fare services
+Flight Service	FlightDB	Flights	Used by Booking service
+Fare Service	FareDB	Fares	Used by Booking service
+Booking Service	BookingDB	Bookings, Passengers	Calls City, Flight, Fare services
+Check-In Service	CheckInDB	CheckIns	Calls Booking service
+
+
+
+what if i have a layer between a controller and repository called process which will take care of cross service communication and implementation 
+
+means controller call a process- process communicates with other apis and perform its action and then calls repository to perform certain action desired
+ChatGPT said:
+That’s a great approach! 🚀 Adding a Process Layer between the Controller and Repository is an excellent way to:
+
+✅ Separate concerns – Keeps controllers thin and focused on request handling.
+✅ Centralize business logic – The Process Layer manages cross-service communication and any complex workflows.
+✅ Improve maintainability – If API endpoints or service logic change, you only update the Process Layer without modifying controllers.
+✅ Enhance testing – You can easily mock the Process Layer for unit testing controllers.
+
+🔹 How Your Architecture Will Work
+1️⃣ Controller – Handles incoming API requests and calls the Process Layer.
+2️⃣ Process Layer – Calls external APIs (cross-service communication), performs business logic, and then interacts with the Repository.
+3️⃣ Repository – Handles database operations.
+
+🔹 Example: Booking Process Flow with Process Layer
+📌 Scenario: A user books a flight after selecting a search result.
+
+Controller receives the booking request and forwards it to the BookingProcess.
+BookingProcess:
+Calls City Service to get airport charges.
+Calls Fare Service to get base fare and convenience charge.
+Calls Flight Service to update available seats.
+Calls the Repository to store the booking and passenger details.
+Repository saves the booking in the database.
+Controller returns the booking confirmation.
+🔹 Code Implementation: Booking Service
+1️⃣ Booking Controller (Calls Process Layer)
+csharp
+Copy
+Edit
+[ApiController]
+[Route("api/bookings")]
+public class BookingController : ControllerBase
+{
+    private readonly IBookingProcess _bookingProcess;
+
+    public BookingController(IBookingProcess bookingProcess)
+    {
+        _bookingProcess = bookingProcess;
+    }
+
+    [HttpPost("book")]
+    public async Task<IActionResult> BookFlight([FromBody] BookingRequestDTO request)
+    {
+        var bookingReference = await _bookingProcess.BookFlightAsync(request);
+        return Ok(new { ReferenceNumber = bookingReference });
+    }
+
+    [HttpGet("{referenceNumber}")]
+    public async Task<IActionResult> GetBookingDetails(string referenceNumber)
+    {
+        var booking = await _bookingProcess.GetBookingDetailsAsync(referenceNumber);
+        return booking != null ? Ok(booking) : NotFound();
+    }
+}
+2️⃣ Booking Process (Handles API Calls & Business Logic)
+csharp
+Copy
+Edit
+public class BookingProcess : IBookingProcess
+{
+    private readonly IBookingRepository _bookingRepository;
+    private readonly IHttpClientFactory _httpClientFactory;
+
+    public BookingProcess(IBookingRepository bookingRepository, IHttpClientFactory httpClientFactory)
+    {
+        _bookingRepository = bookingRepository;
+        _httpClientFactory = httpClientFactory;
+    }
+
+    public async Task<string> BookFlightAsync(BookingRequestDTO request)
+    {
+        var httpClient = _httpClientFactory.CreateClient();
+
+        // 1️⃣ Fetch Airport Charge from City Service
+        var cityResponse = await httpClient.GetFromJsonAsync<CityDTO>($"http://localhost:5001/api/cities/{request.SourceCity}");
+        decimal airportCharge = cityResponse?.AirportCharge ?? 0;
+
+        // 2️⃣ Fetch Fare Details from Fare Service
+        var fareResponse = await httpClient.GetFromJsonAsync<FareDTO>($"http://localhost:5002/api/fares/{request.FlightNumber}");
+        decimal baseFare = fareResponse?.BasePrice ?? 0;
+        decimal convenienceCharge = fareResponse?.ConvenienceCharge ?? 0;
+
+        // 3️⃣ Calculate Total Fare
+        decimal totalFare = baseFare + convenienceCharge + airportCharge;
+
+        // 4️⃣ Generate Unique Booking Reference
+        string bookingReference = Guid.NewGuid().ToString().Substring(0, 8).ToUpper();
+
+        // 5️⃣ Update Available Seats in Flight Service
+        var updateSeatsRequest = new { FlightNumber = request.FlightNumber, SeatsToBook = request.Passengers.Count };
+        var updateSeatsResponse = await httpClient.PutAsJsonAsync("http://localhost:5003/api/flights/update-seats", updateSeatsRequest);
+
+        if (!updateSeatsResponse.IsSuccessStatusCode)
+        {
+            throw new Exception("Failed to update available seats.");
+        }
+
+        // 6️⃣ Save Booking & Passengers to DB
+        await _bookingRepository.SaveBookingAsync(bookingReference, request, totalFare);
+
+        return bookingReference;
+    }
+
+    public async Task<BookingDetailsDTO> GetBookingDetailsAsync(string referenceNumber)
+    {
+        return await _bookingRepository.GetBookingDetailsByReferenceAsync(referenceNumber);
+    }
+}
+3️⃣ Booking Repository (Handles Database Transactions)
+csharp
+Copy
+Edit
+public class BookingRepository : IBookingRepository
+{
+    private readonly BookingDbContext _context;
+
+    public BookingRepository(BookingDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task SaveBookingAsync(string bookingReference, BookingRequestDTO request, decimal totalFare)
+    {
+        var booking = new Booking
+        {
+            ReferenceNumber = bookingReference,
+            FlightNumber = request.FlightNumber,
+            TotalFare = totalFare,
+            BookingDate = DateTime.UtcNow
+        };
+
+        _context.Bookings.Add(booking);
+        await _context.SaveChangesAsync();
+
+        foreach (var passenger in request.Passengers)
+        {
+            _context.Passengers.Add(new Passenger
+            {
+                BookingId = booking.BookingId,
+                FullName = passenger.FullName,
+                Email = passenger.Email
+            });
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<BookingDetailsDTO> GetBookingDetailsByReferenceAsync(string referenceNumber)
+    {
+        return await _context.Bookings
+            .Where(b => b.ReferenceNumber == referenceNumber)
+            .Select(b => new BookingDetailsDTO
+            {
+                ReferenceNumber = b.ReferenceNumber,
+                FlightNumber = b.FlightNumber,
+                TotalFare = b.TotalFare,
+                BookingDate = b.BookingDate,
+                Passengers = b.Passengers.Select(p => new PassengerDTO
+                {
+                    FullName = p.FullName,
+                    Email = p.Email
+                }).ToList()
+            })
+            .FirstOrDefaultAsync();
+    }
+}
+🔹 Advantages of Using a Process Layer
+✅ 1. Keeps Controllers Thin
+Controllers only forward requests to the Process Layer, making them lightweight.
+✅ 2. Centralizes Business Logic
+The Process Layer manages cross-service communication and business logic instead of the controller or repository.
+✅ 3. Decouples External API Calls
+If API endpoints change, only the Process Layer needs modification.
+✅ 4. Improves Testability
+You can mock the Process Layer in unit tests for controllers.
+🔹 Summary of Layered Design
+Layer	Responsibility
+Controller	Handles HTTP requests and responses. Calls Process Layer.
+Process Layer	Calls external APIs, performs calculations, then calls Repository.
+Repository	Handles database operations (CRUD).
