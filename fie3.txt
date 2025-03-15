@@ -273,3 +273,195 @@ sql
 Copy
 Edit
 DELETE FROM CheckIns WHERE ReferenceNumber = 'AB20251234';
+
+
+
+
+CheckInRepository.cs
+csharp
+Copy
+Edit
+public class CheckInRepository : ICheckInRepository
+{
+    private readonly CheckInDbContext _context;
+
+    public CheckInRepository(CheckInDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<CheckInResponseDTO> CheckInPassengerAsync(CheckInRequestDTO request)
+    {
+        var seatNumber = GenerateSeatNumber();
+        var checkIn = new CheckIn
+        {
+            ReferenceNumber = request.ReferenceNumber,
+            PassengerName = request.PassengerName,
+            SeatNumber = seatNumber
+        };
+
+        _context.CheckIns.Add(checkIn);
+        await _context.SaveChangesAsync();
+
+        return new CheckInResponseDTO
+        {
+            CheckInId = checkIn.CheckInId,
+            ReferenceNumber = checkIn.ReferenceNumber,
+            PassengerName = checkIn.PassengerName,
+            SeatNumber = checkIn.SeatNumber,
+            CheckInTime = checkIn.CheckInTime
+        };
+    }
+
+    public async Task<CheckInResponseDTO> GetCheckInDetailsAsync(string checkInId)
+    {
+        var checkIn = await _context.CheckIns.FirstOrDefaultAsync(c => c.CheckInId == checkInId);
+        if (checkIn == null) throw new Exception("Check-in not found.");
+
+        return new CheckInResponseDTO
+        {
+            CheckInId = checkIn.CheckInId,
+            ReferenceNumber = checkIn.ReferenceNumber,
+            PassengerName = checkIn.PassengerName,
+            SeatNumber = checkIn.SeatNumber,
+            CheckInTime = checkIn.CheckInTime
+        };
+    }
+
+    private string GenerateSeatNumber()
+    {
+        Random random = new Random();
+        int seat = random.Next(1, 30);
+        char row = (char)('A' + random.Next(0, 6)); // A-F rows
+        return $"{row}{seat}";
+    }
+}
+3️⃣ Process Layer (Handles Booking API Communication)
+ICheckInProcess.cs
+csharp
+Copy
+Edit
+public interface ICheckInProcess
+{
+    Task<CheckInResponseDTO> ProcessCheckInAsync(CheckInRequestDTO request);
+}
+CheckInProcess.cs
+csharp
+Copy
+Edit
+public class CheckInProcess : ICheckInProcess
+{
+    private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
+    private readonly ICheckInRepository _checkInRepository;
+
+    public CheckInProcess(HttpClient httpClient, IConfiguration configuration, ICheckInRepository checkInRepository)
+    {
+        _httpClient = httpClient;
+        _configuration = configuration;
+        _checkInRepository = checkInRepository;
+    }
+
+    public async Task<CheckInResponseDTO> ProcessCheckInAsync(CheckInRequestDTO request)
+    {
+        string bookingServiceUrl = _configuration["ServiceUrls:BookingService"];
+
+        // Verify booking reference from Booking Service
+        var bookingResponse = await _httpClient.GetAsync($"{bookingServiceUrl}/api/booking/{request.ReferenceNumber}");
+        if (!bookingResponse.IsSuccessStatusCode)
+        {
+            throw new Exception("Invalid booking reference.");
+        }
+
+        return await _checkInRepository.CheckInPassengerAsync(request);
+    }
+}
+4️⃣ Controller (CheckInController.cs)
+csharp
+Copy
+Edit
+[Route("api/[controller]")]
+[ApiController]
+public class CheckInController : ControllerBase
+{
+    private readonly ICheckInProcess _checkInProcess;
+
+    public CheckInController(ICheckInProcess checkInProcess)
+    {
+        _checkInProcess = checkInProcess;
+    }
+
+    // CHECK-IN A PASSENGER
+    [HttpPost("checkin")]
+    public async Task<IActionResult> CheckInPassenger([FromBody] CheckInRequestDTO request)
+    {
+        try
+        {
+            var response = await _checkInProcess.ProcessCheckInAsync(request);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // GET CHECK-IN DETAILS
+    [HttpGet("{checkInId}")]
+    public async Task<IActionResult> GetCheckInDetails(string checkInId)
+    {
+        try
+        {
+            var response = await _checkInProcess.GetCheckInDetailsAsync(checkInId);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+}
+5️⃣ Program.cs
+csharp
+Copy
+Edit
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services
+builder.Services.AddDbContext<CheckInDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("CheckInDB")));
+
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<ICheckInRepository, CheckInRepository>();
+builder.Services.AddScoped<ICheckInProcess, CheckInProcess>();
+builder.Services.AddControllers();
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+
+app.UseRouting();
+app.UseAuthorization();
+app.MapControllers();
+
+app.Run();
+6️⃣ Configuration (appsettings.json)
+json
+Copy
+Edit
+"ConnectionStrings": {
+  "CheckInDB": "Server=(local)\\sqlexpress;Database=CheckInDB;Trusted_Connection=True;TrustServerCertificate=True;"
+},
+"ServiceUrls": {
+  "BookingService": "http://localhost:5001"
+}
+🚀 Summary
+Check-in Service is independent of Booking Service but verifies the reference before check-in.
+Process layer handles API communication with Booking Service.
+Repository handles database transactions.
+Seat assignment is automated.
+CheckInController exposes APIs for check-in and retrieval.
