@@ -465,3 +465,290 @@ Process layer handles API communication with Booking Service.
 Repository handles database transactions.
 Seat assignment is automated.
 CheckInController exposes APIs for check-in and retrieval.
+
+
+
+
+
+For a booking there can be many passengers And they all have same reference number how I can assign then unique seatas and then update in booking service passengers table
+ChatGPT said:
+Since a booking can have multiple passengers, each passenger should get a unique seat number, and the Booking Service's passengers table must be updated with the assigned seat numbers.
+
+Here’s how we can achieve this in the Check-in Service:
+
+Steps to Implement:
+Check if the booking reference exists → Validate with the Booking Service.
+Fetch all passengers associated with the booking → Get them from the Booking Service.
+Assign unique seat numbers → Ensure no duplicates.
+Save check-in details in the Check-in Service → Store it in the local database.
+Update the Booking Service with seat assignments → Send an API request to update passenger details.
+1️⃣ Update Repository to Assign Seats for All Passengers
+ICheckInRepository.cs
+csharp
+Copy
+Edit
+public interface ICheckInRepository
+{
+    Task<List<CheckInResponseDTO>> CheckInPassengersAsync(string referenceNumber, List<string> passengerNames);
+    Task<CheckInResponseDTO> GetCheckInDetailsAsync(string checkInId);
+}
+CheckInRepository.cs
+csharp
+Copy
+Edit
+public class CheckInRepository : ICheckInRepository
+{
+    private readonly CheckInDbContext _context;
+
+    public CheckInRepository(CheckInDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<List<CheckInResponseDTO>> CheckInPassengersAsync(string referenceNumber, List<string> passengerNames)
+    {
+        var seatNumbers = GenerateUniqueSeatNumbers(passengerNames.Count);
+        var checkIns = new List<CheckIn>();
+
+        for (int i = 0; i < passengerNames.Count; i++)
+        {
+            var checkIn = new CheckIn
+            {
+                ReferenceNumber = referenceNumber,
+                PassengerName = passengerNames[i],
+                SeatNumber = seatNumbers[i]
+            };
+
+            checkIns.Add(checkIn);
+        }
+
+        await _context.CheckIns.AddRangeAsync(checkIns);
+        await _context.SaveChangesAsync();
+
+        return checkIns.Select(c => new CheckInResponseDTO
+        {
+            CheckInId = c.CheckInId,
+            ReferenceNumber = c.ReferenceNumber,
+            PassengerName = c.PassengerName,
+            SeatNumber = c.SeatNumber,
+            CheckInTime = c.CheckInTime
+        }).ToList();
+    }
+
+    public async Task<CheckInResponseDTO> GetCheckInDetailsAsync(string checkInId)
+    {
+        var checkIn = await _context.CheckIns.FirstOrDefaultAsync(c => c.CheckInId == checkInId);
+        if (checkIn == null) throw new Exception("Check-in not found.");
+
+        return new CheckInResponseDTO
+        {
+            CheckInId = checkIn.CheckInId,
+            ReferenceNumber = checkIn.ReferenceNumber,
+            PassengerName = checkIn.PassengerName,
+            SeatNumber = checkIn.SeatNumber,
+            CheckInTime = checkIn.CheckInTime
+        };
+    }
+
+    private List<string> GenerateUniqueSeatNumbers(int count)
+    {
+        HashSet<string> seatNumbers = new HashSet<string>();
+        Random random = new Random();
+
+        while (seatNumbers.Count < count)
+        {
+            int seat = random.Next(1, 30);
+            char row = (char)('A' + random.Next(0, 6));
+            seatNumbers.Add($"{row}{seat}");
+        }
+
+        return seatNumbers.ToList();
+    }
+}
+2️⃣ Process Layer (Handles Booking API Communication)
+ICheckInProcess.cs
+csharp
+Copy
+Edit
+public interface ICheckInProcess
+{
+    Task<List<CheckInResponseDTO>> ProcessCheckInAsync(string referenceNumber);
+}
+CheckInProcess.cs
+csharp
+Copy
+Edit
+public class CheckInProcess : ICheckInProcess
+{
+    private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
+    private readonly ICheckInRepository _checkInRepository;
+
+    public CheckInProcess(HttpClient httpClient, IConfiguration configuration, ICheckInRepository checkInRepository)
+    {
+        _httpClient = httpClient;
+        _configuration = configuration;
+        _checkInRepository = checkInRepository;
+    }
+
+    public async Task<List<CheckInResponseDTO>> ProcessCheckInAsync(string referenceNumber)
+    {
+        string bookingServiceUrl = _configuration["ServiceUrls:BookingService"];
+
+        // Step 1: Verify if booking exists
+        var bookingResponse = await _httpClient.GetAsync($"{bookingServiceUrl}/api/booking/{referenceNumber}");
+        if (!bookingResponse.IsSuccessStatusCode)
+        {
+            throw new Exception("Invalid booking reference.");
+        }
+
+        var bookingDetails = await bookingResponse.Content.ReadFromJsonAsync<BookingDTO>();
+        if (bookingDetails == null || bookingDetails.Passengers.Count == 0)
+        {
+            throw new Exception("No passengers found for this booking.");
+        }
+
+        // Step 2: Check-in all passengers
+        var checkInResponses = await _checkInRepository.CheckInPassengersAsync(referenceNumber, bookingDetails.Passengers);
+
+        // Step 3: Update Booking Service with seat numbers
+        var updateRequest = new UpdateBookingSeatsDTO
+        {
+            ReferenceNumber = referenceNumber,
+            SeatAssignments = checkInResponses.Select(c => new PassengerSeatDTO
+            {
+                PassengerName = c.PassengerName,
+                SeatNumber = c.SeatNumber
+            }).ToList()
+        };
+
+        var updateResponse = await _httpClient.PutAsJsonAsync($"{bookingServiceUrl}/api/booking/update-seats", updateRequest);
+        if (!updateResponse.IsSuccessStatusCode)
+        {
+            throw new Exception("Failed to update booking service with seat assignments.");
+        }
+
+        return checkInResponses;
+    }
+}
+3️⃣ Controller
+csharp
+Copy
+Edit
+[Route("api/[controller]")]
+[ApiController]
+public class CheckInController : ControllerBase
+{
+    private readonly ICheckInProcess _checkInProcess;
+
+    public CheckInController(ICheckInProcess checkInProcess)
+    {
+        _checkInProcess = checkInProcess;
+    }
+
+    // CHECK-IN ALL PASSENGERS FOR A BOOKING
+    [HttpPost("checkin/{referenceNumber}")]
+    public async Task<IActionResult> CheckInPassengers(string referenceNumber)
+    {
+        try
+        {
+            var response = await _checkInProcess.ProcessCheckInAsync(referenceNumber);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // GET CHECK-IN DETAILS
+    [HttpGet("{checkInId}")]
+    public async Task<IActionResult> GetCheckInDetails(string checkInId)
+    {
+        try
+        {
+            var response = await _checkInProcess.GetCheckInDetailsAsync(checkInId);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+}
+4️⃣ DTOs for Booking Service Communication
+BookingDTO.cs (Incoming Data)
+csharp
+Copy
+Edit
+public class BookingDTO
+{
+    public string ReferenceNumber { get; set; }
+    public List<string> Passengers { get; set; }
+}
+UpdateBookingSeatsDTO.cs (Outgoing Data)
+csharp
+Copy
+Edit
+public class UpdateBookingSeatsDTO
+{
+    public string ReferenceNumber { get; set; }
+    public List<PassengerSeatDTO> SeatAssignments { get; set; }
+}
+
+public class PassengerSeatDTO
+{
+    public string PassengerName { get; set; }
+    public string SeatNumber { get; set; }
+}
+5️⃣ Program.cs
+csharp
+Copy
+Edit
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services
+builder.Services.AddDbContext<CheckInDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("CheckInDB")));
+
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<ICheckInRepository, CheckInRepository>();
+builder.Services.AddScoped<ICheckInProcess, CheckInProcess>();
+builder.Services.AddControllers();
+
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+
+app.UseRouting();
+app.UseAuthorization();
+app.MapControllers();
+app.Run();
+6️⃣ Booking Service API Update Endpoint
+BookingController.cs
+csharp
+Copy
+Edit
+[HttpPut("update-seats")]
+public async Task<IActionResult> UpdateSeats([FromBody] UpdateBookingSeatsDTO request)
+{
+    foreach (var seat in request.SeatAssignments)
+    {
+        var passenger = await _context.Passengers.FirstOrDefaultAsync(p => p.ReferenceNumber == request.ReferenceNumber && p.Name == seat.PassengerName);
+        if (passenger != null)
+        {
+            passenger.SeatNumber = seat.SeatNumber;
+        }
+    }
+
+    await _context.SaveChangesAsync();
+    return Ok("Seats updated successfully.");
+}
+🚀 Final Workflow
+✔ Check-in Service fetches passengers from Booking Service
+✔ Assigns unique seats to each passenger
+✔ Stores check-in details in Check-in DB
+✔ Updates Booking Service with assigned seats
