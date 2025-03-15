@@ -1,0 +1,275 @@
+can you generate the checkin service database, repository, controller and process again
+ChatGPT said:
+Here is the implementation for the Check-in Service including the database model, DTOs, repository, and controller. This service will allow users to check in for their booked flights and receive a check-in ID and seat number.
+
+1️⃣ Database Models (CheckIn.cs)
+This model stores check-in details.
+
+csharp
+Copy
+Edit
+public class CheckIn
+{
+    public int Id { get; set; }
+    public string CheckInId { get; set; } // Unique check-in ID
+    public string ReferenceNumber { get; set; } // Booking reference
+    public string SeatNumber { get; set; } // Assigned seat
+    public DateTime CheckInTime { get; set; } // Timestamp of check-in
+}
+2️⃣ DTOs (CheckInRequestDTO.cs & CheckInResponseDTO.cs)
+Check-in request DTO
+csharp
+Copy
+Edit
+public class CheckInRequestDTO
+{
+    public string ReferenceNumber { get; set; } // Booking reference number
+}
+Check-in response DTO
+csharp
+Copy
+Edit
+public class CheckInResponseDTO
+{
+    public string CheckInId { get; set; } 
+    public string ReferenceNumber { get; set; } 
+    public string SeatNumber { get; set; } 
+    public DateTime CheckInTime { get; set; } 
+}
+3️⃣ Repository (ICheckInRepository.cs & CheckInRepository.cs)
+Interface (ICheckInRepository.cs)
+csharp
+Copy
+Edit
+public interface ICheckInRepository
+{
+    Task<CheckInResponseDTO> CheckInAsync(CheckInRequestDTO request);
+    Task<CheckInResponseDTO> GetCheckInDetailsAsync(string referenceNumber);
+}
+Repository Implementation (CheckInRepository.cs)
+csharp
+Copy
+Edit
+public class CheckInRepository : ICheckInRepository
+{
+    private readonly CheckInDbContext _context;
+    private readonly BookingDbContext _bookingContext;
+
+    public CheckInRepository(CheckInDbContext context, BookingDbContext bookingContext)
+    {
+        _context = context;
+        _bookingContext = bookingContext;
+    }
+
+    public async Task<CheckInResponseDTO> CheckInAsync(CheckInRequestDTO request)
+    {
+        try
+        {
+            // Validate booking reference
+            var booking = await _bookingContext.Bookings.FirstOrDefaultAsync(b => b.ReferenceNumber == request.ReferenceNumber);
+            if (booking == null)
+                throw new Exception("Booking not found.");
+
+            if (booking.CheckedIn)
+                throw new Exception("Passenger already checked in.");
+
+            // Generate a unique Check-in ID
+            string checkInId = "CHK" + new Random().Next(10000, 99999);
+
+            // Generate a random seat number
+            string seatNumber = "A" + new Random().Next(1, 30);
+
+            // Create check-in record
+            var checkIn = new CheckIn
+            {
+                CheckInId = checkInId,
+                ReferenceNumber = request.ReferenceNumber,
+                SeatNumber = seatNumber,
+                CheckInTime = DateTime.UtcNow
+            };
+
+            _context.CheckIns.Add(checkIn);
+            await _context.SaveChangesAsync();
+
+            // Update booking status
+            booking.CheckedIn = true;
+            booking.CheckInId = checkInId;
+            booking.SeatNumber = seatNumber;
+            _bookingContext.Bookings.Update(booking);
+            await _bookingContext.SaveChangesAsync();
+
+            return new CheckInResponseDTO
+            {
+                CheckInId = checkInId,
+                ReferenceNumber = request.ReferenceNumber,
+                SeatNumber = seatNumber,
+                CheckInTime = checkIn.CheckInTime
+            };
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error during check-in: " + ex.Message);
+        }
+    }
+
+    public async Task<CheckInResponseDTO> GetCheckInDetailsAsync(string referenceNumber)
+    {
+        try
+        {
+            var checkIn = await _context.CheckIns.FirstOrDefaultAsync(c => c.ReferenceNumber == referenceNumber);
+            if (checkIn == null)
+                throw new Exception("Check-in details not found.");
+
+            return new CheckInResponseDTO
+            {
+                CheckInId = checkIn.CheckInId,
+                ReferenceNumber = checkIn.ReferenceNumber,
+                SeatNumber = checkIn.SeatNumber,
+                CheckInTime = checkIn.CheckInTime
+            };
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Error retrieving check-in details: " + ex.Message);
+        }
+    }
+}
+4️⃣ Controller (CheckInController.cs)
+csharp
+Copy
+Edit
+[Route("api/[controller]")]
+[ApiController]
+public class CheckInController : ControllerBase
+{
+    private readonly ICheckInRepository _checkInRepository;
+
+    public CheckInController(ICheckInRepository checkInRepository)
+    {
+        _checkInRepository = checkInRepository;
+    }
+
+    // CHECK-IN REQUEST
+    [HttpPost("check-in")]
+    public async Task<IActionResult> CheckIn([FromBody] CheckInRequestDTO request)
+    {
+        try
+        {
+            var response = await _checkInRepository.CheckInAsync(request);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // GET CHECK-IN DETAILS BY REFERENCE NUMBER
+    [HttpGet("{referenceNumber}")]
+    public async Task<IActionResult> GetCheckInDetails(string referenceNumber)
+    {
+        try
+        {
+            var checkInDetails = await _checkInRepository.GetCheckInDetailsAsync(referenceNumber);
+            return Ok(checkInDetails);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+}
+5️⃣ Database Context (CheckInDbContext.cs)
+csharp
+Copy
+Edit
+public class CheckInDbContext : DbContext
+{
+    public CheckInDbContext(DbContextOptions<CheckInDbContext> options) : base(options) { }
+
+    public DbSet<CheckIn> CheckIns { get; set; }
+}
+6️⃣ API Endpoints
+✅ Check-in for a flight
+bash
+Copy
+Edit
+POST http://localhost:5005/api/checkin/check-in
+Content-Type: application/json
+
+{
+  "ReferenceNumber": "AB20251234"
+}
+✅ Get check-in details
+bash
+Copy
+Edit
+GET http://localhost:5005/api/checkin/AB20251234
+7️⃣ Configuration (appsettings.json)
+json
+Copy
+Edit
+"ConnectionStrings": {
+  "CheckInDB": "Server=(local)\\sqlexpress;Database=CheckInDB;Trusted_Connection=True;"
+}
+Summary of the Process
+Passenger books a flight via BookingService, receiving a ReferenceNumber.
+Passenger requests check-in via CheckInService, passing their ReferenceNumber.
+System validates booking and checks if already checked-in.
+Generates a unique Check-in ID & Seat Number.
+Stores check-in details in the database and updates the booking.
+Passenger retrieves check-in details with ReferenceNumber.
+This completes the Check-in Service with all necessary components. Let me know if you need modifications or further enhancements! 🚀
+
+You said:
+Generate code for creating database and table for this check-in service
+ChatGPT said:
+Here is the SQL script to create the database and table for the Check-in Service in SQL Server.
+
+1️⃣ Create Database
+sql
+Copy
+Edit
+CREATE DATABASE CheckInDB;
+GO
+2️⃣ Use the Database
+sql
+Copy
+Edit
+USE CheckInDB;
+GO
+3️⃣ Create Table for Check-in Details
+sql
+Copy
+Edit
+CREATE TABLE CheckIns (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    CheckInId NVARCHAR(20) UNIQUE NOT NULL, -- Unique Check-in ID
+    ReferenceNumber NVARCHAR(20) NOT NULL,  -- Booking Reference Number
+    SeatNumber NVARCHAR(5) NOT NULL,        -- Assigned Seat Number
+    CheckInTime DATETIME DEFAULT GETDATE()  -- Timestamp of Check-in
+);
+GO
+4️⃣ Create Indexes for Faster Lookup
+sql
+Copy
+Edit
+CREATE INDEX IX_CheckIns_ReferenceNumber ON CheckIns(ReferenceNumber);
+5️⃣ Sample Insert Statement
+You can insert sample check-in data using:
+
+sql
+Copy
+Edit
+INSERT INTO CheckIns (CheckInId, ReferenceNumber, SeatNumber, CheckInTime)
+VALUES ('CHK12345', 'AB20251234', 'A12', GETDATE());
+6️⃣ Retrieve Check-in Details
+sql
+Copy
+Edit
+SELECT * FROM CheckIns WHERE ReferenceNumber = 'AB20251234';
+7️⃣ Delete Check-in Data (If Needed)
+sql
+Copy
+Edit
+DELETE FROM CheckIns WHERE ReferenceNumber = 'AB20251234';
