@@ -218,3 +218,28 @@ Edit
 🔹 Now, we can start developing the Login Page first.
 
 Would you like me to generate the Login Page next and integrate it with the backend JWT authentication? 🎯
+
+import { Injectable } from '@angular/core';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthService {
+  constructor() {}
+
+  // ✅ Check if user is logged in
+  isLoggedIn(): boolean {
+    return !!sessionStorage.getItem('token'); // Returns true if token exists
+  }
+
+  // ✅ Save token in session storage
+  saveToken(token: string): void {
+    sessionStorage.setItem('token', token);
+  }
+
+  // ✅ Remove token on logout
+  logout(): void {
+    sessionStorage.removeItem('token');
+  }
+}
+
