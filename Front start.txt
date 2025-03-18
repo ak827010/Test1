@@ -1,0 +1,220 @@
+📌 Step 1: Install Angular CLI & Create a New Project
+1️⃣ Install Angular CLI (if not already installed):
+
+sh
+Copy
+Edit
+npm install -g @angular/cli
+2️⃣ Create a new Angular project:
+
+sh
+Copy
+Edit
+ng new flights-app
+It will ask:
+Would you like to add Angular routing? → Yes
+Which CSS preprocessor to use? → Choose CSS
+3️⃣ Navigate into the project:
+
+sh
+Copy
+Edit
+cd flights-app
+4️⃣ Run the application:
+
+sh
+Copy
+Edit
+ng serve
+Open your browser and go to http://localhost:4200
+✅ Now you have a working Angular project!
+
+📌 Step 2: Install Required Packages
+We'll install some necessary libraries for Bootstrap, HTTP handling, JWT authentication, and routing guards.
+
+sh
+Copy
+Edit
+npm install bootstrap @auth0/angular-jwt
+Bootstrap → Used for styling
+@auth0/angular-jwt → Used to handle JWT authentication
+✅ Now, configure Bootstrap:
+Open angular.json and add Bootstrap CSS under "styles":
+
+json
+Copy
+Edit
+"styles": [
+  "node_modules/bootstrap/dist/css/bootstrap.min.css",
+  "src/styles.css"
+]
+📌 Step 3: Plan the Folder Structure
+We will structure the project for better scalability.
+
+ruby
+Copy
+Edit
+flights-app/
+│── src/
+│   ├── app/
+│   │   ├── components/        # All UI components (Search, Booking, etc.)
+│   │   ├── pages/             # Complete pages (Home, Admin Dashboard, etc.)
+│   │   ├── services/          # API service files (Auth, Booking, etc.)
+│   │   ├── models/            # Interfaces for data models
+│   │   ├── guards/            # Auth guards for admin access
+│   │   ├── app-routing.module.ts  # App Routing
+│   │   ├── app.module.ts      # Main module
+│   ├── assets/                # Static assets like images
+│   ├── styles.css             # Global styles
+📌 Step 4: Create Essential Angular Modules & Components
+We'll generate components for each page using Angular CLI.
+
+sh
+Copy
+Edit
+ng g c pages/home
+ng g c pages/search-flights
+ng g c pages/booking
+ng g c pages/check-in
+ng g c pages/admin-dashboard
+ng g c pages/login
+✅ These are the key pages:
+
+Home Page → Displays a welcome message with search options.
+Search Flights → Allows users to search for available flights.
+Booking Page → Lets users book a flight.
+Check-in Page → Allows passengers to check in.
+Admin Dashboard → Restricted access for admins to manage flights and cities.
+Login Page → Allows the admin to log in.
+📌 Step 5: Create Services for API Calls
+We'll create separate services to handle API communication.
+
+sh
+Copy
+Edit
+ng g s services/auth
+ng g s services/flight
+ng g s services/booking
+ng g s services/checkin
+ng g s services/city
+✅ Services will handle API requests for:
+
+Authentication (auth.service.ts)
+Flight Search (flight.service.ts)
+Booking (booking.service.ts)
+Check-in (checkin.service.ts)
+City Management (city.service.ts)
+📌 Step 6: Set Up Routing
+Modify app-routing.module.ts to define routes for our pages.
+
+📌 src/app/app-routing.module.ts
+
+typescript
+Copy
+Edit
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { HomeComponent } from './pages/home/home.component';
+import { SearchFlightsComponent } from './pages/search-flights/search-flights.component';
+import { BookingComponent } from './pages/booking/booking.component';
+import { CheckInComponent } from './pages/check-in/check-in.component';
+import { AdminDashboardComponent } from './pages/admin-dashboard/admin-dashboard.component';
+import { LoginComponent } from './pages/login/login.component';
+
+const routes: Routes = [
+  { path: '', component: HomeComponent },
+  { path: 'search-flights', component: SearchFlightsComponent },
+  { path: 'booking', component: BookingComponent },
+  { path: 'check-in', component: CheckInComponent },
+  { path: 'admin', component: AdminDashboardComponent },
+  { path: 'login', component: LoginComponent },
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule { }
+✅ Now, Angular knows how to navigate between pages!
+
+📌 Step 7: Set Up Authentication Handling
+Since only admins can log in, we need an Auth Guard.
+
+1️⃣ Generate Auth Guard
+
+sh
+Copy
+Edit
+ng g guard guards/auth
+2️⃣ Modify auth.guard.ts 📌 src/app/guards/auth.guard.ts
+
+typescript
+Copy
+Edit
+import { Injectable } from '@angular/core';
+import { CanActivate, Router } from '@angular/router';
+import { AuthService } from '../services/auth.service';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthGuard implements CanActivate {
+  constructor(private authService: AuthService, private router: Router) {}
+
+  canActivate(): boolean {
+    if (this.authService.isLoggedIn()) {
+      return true;
+    } else {
+      this.router.navigate(['/login']);
+      return false;
+    }
+  }
+}
+✅ Now, protect the admin route!
+Modify app-routing.module.ts:
+
+typescript
+Copy
+Edit
+import { AuthGuard } from './guards/auth.guard';
+
+const routes: Routes = [
+  { path: 'admin', component: AdminDashboardComponent, canActivate: [AuthGuard] }
+];
+📌 Step 8: Setup Global Navbar
+We need a Navbar so users can navigate between pages.
+
+📌 Generate Navbar Component
+
+sh
+Copy
+Edit
+ng g c components/navbar
+📌 Modify navbar.component.html
+
+html
+Copy
+Edit
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <a class="navbar-brand" routerLink="/">FlightsApp</a>
+  <div class="collapse navbar-collapse">
+    <ul class="navbar-nav">
+      <li class="nav-item"><a class="nav-link" routerLink="/">Home</a></li>
+      <li class="nav-item"><a class="nav-link" routerLink="/search-flights">Search Flights</a></li>
+      <li class="nav-item"><a class="nav-link" routerLink="/check-in">Check-In</a></li>
+      <li class="nav-item"><a class="nav-link" routerLink="/admin">Admin Dashboard</a></li>
+    </ul>
+  </div>
+</nav>
+✅ Now, add it to app.component.html
+
+html
+Copy
+Edit
+<app-navbar></app-navbar>
+<router-outlet></router-outlet>
+📌 Next Steps
+🔹 We have successfully set up the Angular 19 project!
+🔹 Now, we can start developing the Login Page first.
+
+Would you like me to generate the Login Page next and integrate it with the backend JWT authentication? 🎯
