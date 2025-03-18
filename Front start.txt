@@ -242,4 +242,259 @@ export class AuthService {
     sessionStorage.removeItem('token');
   }
 }
+Login Page Implementation with JWT Authentication
+Now, we will create the Login Page and integrate it with the backend authentication service using JWT. Below is the step-by-step process.
+
+📝 Steps to Implement the Login Page
+1️⃣ Create the Login Component
+Run the following command in your Angular project:
+
+sh
+Copy
+Edit
+ng g c components/login
+This will generate the login component inside the components folder.
+
+2️⃣ Update login.component.html
+Replace the content with the following Bootstrap-styled login form:
+
+html
+Copy
+Edit
+<div class="container d-flex justify-content-center align-items-center vh-100">
+  <div class="card p-4 shadow-lg" style="width: 400px;">
+    <h3 class="text-center mb-3">Admin Login</h3>
+    
+    <form (ngSubmit)="onLogin()">
+      <div class="mb-3">
+        <label for="email" class="form-label">Email</label>
+        <input type="email" class="form-control" id="email" [(ngModel)]="email" name="email" required>
+      </div>
+
+      <div class="mb-3">
+        <label for="password" class="form-label">Password</label>
+        <input type="password" class="form-control" id="password" [(ngModel)]="password" name="password" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100" [disabled]="isLoading">
+        <span *ngIf="isLoading" class="spinner-border spinner-border-sm"></span>
+        Login
+      </button>
+    </form>
+
+    <p class="text-center mt-3">
+      <button class="btn btn-link" (click)="continueAsGuest()">Continue as Guest</button>
+    </p>
+
+    <p class="text-danger text-center" *ngIf="errorMessage">{{ errorMessage }}</p>
+  </div>
+</div>
+3️⃣ Update login.component.ts
+Modify the logic to call the backend API for authentication:
+
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { AuthService } from '../../services/auth.service';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-login',
+  templateUrl: './login.component.html',
+  styleUrls: ['./login.component.css']
+})
+export class LoginComponent {
+  email: string = '';
+  password: string = '';
+  isLoading: boolean = false;
+  errorMessage: string = '';
+
+  constructor(private authService: AuthService, private router: Router) {}
+
+  // Login Function
+  onLogin() {
+    this.isLoading = true;
+    this.errorMessage = '';
+
+    this.authService.login(this.email, this.password).subscribe({
+      next: (response) => {
+        this.isLoading = false;
+        this.router.navigate(['/admin-dashboard']); // Redirect after login
+      },
+      error: (error) => {
+        this.isLoading = false;
+        this.errorMessage = 'Invalid credentials. Please try again.';
+      }
+    });
+  }
+
+  // Guest Login
+  continueAsGuest() {
+    this.authService.loginAsGuest();
+    this.router.navigate(['/search-flights']); // Redirect to search flights page
+  }
+}
+4️⃣ Create the AuthService for Authentication
+Run:
+
+sh
+Copy
+Edit
+ng g s services/auth
+Then, update auth.service.ts:
+
+typescript
+Copy
+Edit
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { Observable } from 'rxjs';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthService {
+  private apiUrl = 'http://localhost:5000/api/auth/login'; // Adjust according to your backend
+
+  constructor(private http: HttpClient, private router: Router) {}
+
+  // 🔐 Login API Call
+  login(email: string, password: string): Observable<any> {
+    return this.http.post<any>(this.apiUrl, { email, password });
+  }
+
+  // ✅ Store Token (session-based)
+  saveToken(token: string): void {
+    sessionStorage.setItem('token', token);
+  }
+
+  // 🔍 Check if User is Logged In
+  isLoggedIn(): boolean {
+    return !!sessionStorage.getItem('token');
+  }
+
+  // 🚪 Logout
+  logout(): void {
+    sessionStorage.removeItem('token');
+    this.router.navigate(['/login']);
+  }
+
+  // 🎭 Guest Login (Hardcoded)
+  loginAsGuest(): void {
+    sessionStorage.setItem('role', 'guest'); // Store role as guest
+  }
+
+  // 🔐 Check if Admin
+  isAdmin(): boolean {
+    return sessionStorage.getItem('role') === 'admin';
+  }
+}
+5️⃣ Update app.module.ts
+Ensure that FormsModule, HttpClientModule, and RouterModule are imported.
+
+typescript
+Copy
+Edit
+import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { AppRoutingModule } from './app-routing.module';
+import { AppComponent } from './app.component';
+import { HttpClientModule } from '@angular/common/http';
+import { FormsModule } from '@angular/forms';
+import { LoginComponent } from './components/login/login.component';
+
+@NgModule({
+  declarations: [
+    AppComponent,
+    LoginComponent
+  ],
+  imports: [
+    BrowserModule,
+    AppRoutingModule,
+    HttpClientModule,
+    FormsModule
+  ],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }
+6️⃣ Add Routes in app-routing.module.ts
+typescript
+Copy
+Edit
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { LoginComponent } from './components/login/login.component';
+
+const routes: Routes = [
+  { path: 'login', component: LoginComponent },
+  { path: '', redirectTo: '/login', pathMatch: 'full' } // Redirect to login by default
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule { }
+7️⃣ Secure Admin Pages Using AuthGuard
+Create a guard:
+
+sh
+Copy
+Edit
+ng g guard auth
+Modify auth.guard.ts:
+
+typescript
+Copy
+Edit
+import { Injectable } from '@angular/core';
+import { CanActivate, Router } from '@angular/router';
+import { AuthService } from '../services/auth.service';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthGuard implements CanActivate {
+  constructor(private authService: AuthService, private router: Router) {}
+
+  canActivate(): boolean {
+    if (this.authService.isLoggedIn()) {
+      return true;
+    } else {
+      this.router.navigate(['/login']);
+      return false;
+    }
+  }
+}
+Then, protect admin routes in app-routing.module.ts:
+
+typescript
+Copy
+Edit
+import { AuthGuard } from './guards/auth.guard';
+
+const routes: Routes = [
+  { path: 'admin-dashboard', component: AdminDashboardComponent, canActivate: [AuthGuard] },
+];
+🛠 Testing the Login
+✅ Start Backend:
+Run your backend API first.
+
+sh
+Copy
+Edit
+dotnet run
+✅ Start Frontend:
+sh
+Copy
+Edit
+ng serve
+Now, try logging in using:
+
+Valid admin credentials → Redirects to Admin Dashboard
+Incorrect credentials → Shows error message
+Clicking "Continue as Guest" → Redirects to Search Flights
 
