@@ -946,3 +946,192 @@ In the frontend, search for flights and book one.
 Check the console/logs to ensure the request is hitting the backend.
 Verify that a reference number is generated.
 After confirming, check the confirmation page to see if booking details are fetched from the API.
+
+
+
+
+
+📌 1️⃣ Install Angular Validators
+Angular provides built-in validators, but we’ll also add custom validation for better user experience.
+
+📌 2️⃣ Update search.component.html (Show Validation Errors)
+Modify the form with validation messages:
+
+html
+Copy
+Edit
+<div class="container mt-5">
+  <div class="card shadow p-4">
+    <h2 class="text-center">Search Flights</h2>
+
+    <form #searchForm="ngForm" (ngSubmit)="searchFlights()">
+      <!-- From City -->
+      <div class="mb-3">
+        <label for="fromCity" class="form-label">From</label>
+        <input
+          type="text"
+          id="fromCity"
+          class="form-control"
+          [(ngModel)]="fromCityQuery"
+          name="fromCity"
+          required
+          #fromCityRef="ngModel"
+          (input)="fetchCities('from')"
+          autocomplete="off"
+        />
+        <div *ngIf="fromCityRef.invalid && fromCityRef.touched" class="text-danger">
+          From city is required.
+        </div>
+
+        <ul *ngIf="filteredFromCities.length" class="list-group position-absolute w-100">
+          <li
+            *ngFor="let city of filteredFromCities"
+            class="list-group-item list-group-item-action"
+            (click)="selectCity(city, 'from')"
+          >
+            {{ city.name }} ({{ city.code }})
+          </li>
+        </ul>
+      </div>
+
+      <!-- To City -->
+      <div class="mb-3">
+        <label for="toCity" class="form-label">To</label>
+        <input
+          type="text"
+          id="toCity"
+          class="form-control"
+          [(ngModel)]="toCityQuery"
+          name="toCity"
+          required
+          #toCityRef="ngModel"
+          (input)="fetchCities('to')"
+          autocomplete="off"
+        />
+        <div *ngIf="toCityRef.invalid && toCityRef.touched" class="text-danger">
+          To city is required.
+        </div>
+
+        <ul *ngIf="filteredToCities.length" class="list-group position-absolute w-100">
+          <li
+            *ngFor="let city of filteredToCities"
+            class="list-group-item list-group-item-action"
+            (click)="selectCity(city, 'to')"
+          >
+            {{ city.name }} ({{ city.code }})
+          </li>
+        </ul>
+      </div>
+
+      <!-- Departure Date -->
+      <div class="mb-3">
+        <label for="departureDate" class="form-label">Departure Date</label>
+        <input
+          type="date"
+          id="departureDate"
+          class="form-control"
+          [(ngModel)]="departureDate"
+          name="departureDate"
+          required
+          min="{{ minDate }}"
+          #departureDateRef="ngModel"
+        />
+        <div *ngIf="departureDateRef.invalid && departureDateRef.touched" class="text-danger">
+          Departure date is required and cannot be in the past.
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100" [disabled]="searchForm.invalid">Search Flights</button>
+    </form>
+  </div>
+</div>
+📌 3️⃣ Update search.component.ts (Add Fluent Validation Logic)
+Modify search.component.ts to set minDate dynamically and validate selection:
+
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { CityService } from 'src/app/services/city.service';
+
+@Component({
+  selector: 'app-search',
+  standalone: true,
+  templateUrl: './search.component.html',
+  styleUrls: ['./search.component.css']
+})
+export class SearchComponent {
+  fromCityQuery = '';
+  toCityQuery = '';
+  departureDate = '';
+
+  filteredFromCities: any[] = [];
+  filteredToCities: any[] = [];
+
+  selectedFromCity: any = null;
+  selectedToCity: any = null;
+
+  minDate: string = '';
+
+  constructor(private cityService: CityService, private router: Router) {
+    // Set the minimum date (today's date)
+    const today = new Date();
+    this.minDate = today.toISOString().split('T')[0]; // Format YYYY-MM-DD
+  }
+
+  fetchCities(type: 'from' | 'to') {
+    const query = type === 'from' ? this.fromCityQuery : this.toCityQuery;
+    if (query.length < 2) return; // Prevent unnecessary API calls
+
+    this.cityService.searchCities(query).subscribe({
+      next: (cities) => {
+        if (type === 'from') {
+          this.filteredFromCities = cities;
+        } else {
+          this.filteredToCities = cities;
+        }
+      },
+      error: (error) => console.error('Error fetching cities:', error)
+    });
+  }
+
+  selectCity(city: any, type: 'from' | 'to') {
+    if (type === 'from') {
+      this.selectedFromCity = city;
+      this.fromCityQuery = `${city.name} (${city.code})`;
+      this.filteredFromCities = [];
+    } else {
+      this.selectedToCity = city;
+      this.toCityQuery = `${city.name} (${city.code})`;
+      this.filteredToCities = [];
+    }
+  }
+
+  searchFlights() {
+    if (!this.selectedFromCity || !this.selectedToCity || !this.departureDate) {
+      alert('Please select valid cities and a date!');
+      return;
+    }
+
+    this.router.navigate(['/flights'], {
+      queryParams: {
+        from: this.selectedFromCity.code,
+        to: this.selectedToCity.code,
+        date: this.departureDate
+      }
+    });
+  }
+}
+📌 4️⃣ Test the Validations
+✅ City Selection
+
+Shows error if the from or to city is empty
+Prevents manual text entry without selecting a valid city
+✅ Date Validation
+
+Blocks past dates
+Displays an error if no date is selected
+✅ Submit Button Disabled
+
+The form cannot be submitted unless all fields are valid
