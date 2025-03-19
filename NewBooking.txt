@@ -1,0 +1,948 @@
+📌 Folder Structure in src/app/
+pgsql
+Copy
+Edit
+app/
+│── components/
+│   ├── navbar/
+│   ├── footer/
+│── pages/
+│   ├── landing/
+│   ├── home/
+│   ├── search/
+│   ├── booking/
+│   ├── booking-confirmation/
+│   ├── check-in/
+│   ├── check-in-confirmation/
+│   ├── admin/
+│   │   ├── login/
+│   │   ├── dashboard/
+│   │   ├── flights/
+│   │   ├── cities/
+│── services/   (For API calls)
+│── app-routes.ts  (Defines application routes)
+│── app.component.html  (Main layout)
+📌 Next Steps
+✅ First, let’s generate the Landing Page where users can select their role.
+
+Run this command to generate it:
+
+sh
+Copy
+Edit
+ng generate component pages/landing --standalone
+Let me know once you've done this, and we’ll proceed with the UI design and routing! 🚀
+
+You said:
+okay done
+ChatGPT said:
+Great! Now let's design the Landing Page UI and set up navigation.
+
+📌 1️⃣ Update landing.component.html
+Replace its content with this simple UI:
+
+html
+Copy
+Edit
+<div class="landing-container">
+  <h1>Welcome to Flights Application</h1>
+  <p>Select an option to continue:</p>
+  
+  <button class="btn admin-btn" (click)="loginAsAdmin()">Login as Admin</button>
+  <button class="btn guest-btn" (click)="continueAsGuest()">Continue as Guest</button>
+</div>
+📌 2️⃣ Update landing.component.ts
+Modify the TypeScript file to handle navigation:
+
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-landing',
+  standalone: true,
+  templateUrl: './landing.component.html',
+  styleUrls: ['./landing.component.css']
+})
+export class LandingComponent {
+  constructor(private router: Router) {}
+
+  loginAsAdmin() {
+    this.router.navigate(['/admin/login']);
+  }
+
+  continueAsGuest() {
+    this.router.navigate(['/home']);
+  }
+}
+📌 3️⃣ Style the Page (landing.component.css)
+You can add some basic styling:
+
+css
+Copy
+Edit
+.landing-container {
+  text-align: center;
+  margin-top: 50px;
+}
+
+h1 {
+  color: #333;
+}
+
+p {
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.btn {
+  display: block;
+  width: 200px;
+  padding: 10px;
+  margin: 10px auto;
+  font-size: 16px;
+  border: none;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.admin-btn {
+  background-color: #007bff;
+  color: white;
+}
+
+.guest-btn {
+  background-color: #28a745;
+  color: white;
+}
+📌 4️⃣ Add Routing for the Landing Page
+In app-routes.ts, define the route for the Landing Page:
+
+typescript
+Copy
+Edit
+import { Routes } from '@angular/router';
+
+export const appRoutes: Routes = [
+  { path: '', loadComponent: () => import('./pages/landing/landing.component').then(m => m.LandingComponent) },
+  { path: 'home', loadComponent: () => import('./pages/home/home.component').then(m => m.HomeComponent) },
+  { path: 'admin/login', loadComponent: () => import('./pages/admin/login/login.component').then(m => m.LoginComponent) },
+  { path: '**', redirectTo: '' } // Redirect unknown routes to landing page
+];
+📌 5️⃣ Test the Page
+Now, run the project:
+
+sh
+Copy
+Edit
+ng serve --open
+You should see the Landing Page with two buttons. Clicking them should navigate to the respective pages.
+
+📌 Next Steps
+Now, let's create the Home Page (/home) where users can search for flights.
+
+Run this command to generate it:
+
+sh
+Copy
+Edit
+ng generate component pages/home --standalone
+Let me know once done! 🚀
+
+You said:
+done
+ChatGPT said:
+Awesome! Now let's design the Home Page where users can search for flights.
+
+📌 1️⃣ Update home.component.html
+Replace the default content with this simple UI for the flight search:
+
+html
+Copy
+Edit
+<div class="home-container">
+  <h1>Search for Flights</h1>
+
+  <form (ngSubmit)="searchFlights()">
+    <label for="from">From:</label>
+    <input type="text" id="from" [(ngModel)]="from" name="from" required>
+
+    <label for="to">To:</label>
+    <input type="text" id="to" [(ngModel)]="to" name="to" required>
+
+    <label for="date">Departure Date:</label>
+    <input type="date" id="date" [(ngModel)]="departureDate" name="date" required>
+
+    <button type="submit" class="btn search-btn">Search</button>
+  </form>
+</div>
+📌 2️⃣ Update home.component.ts
+Modify the TypeScript file to handle the flight search:
+
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+
+@Component({
+  selector: 'app-home',
+  standalone: true,
+  templateUrl: './home.component.html',
+  styleUrls: ['./home.component.css'],
+  imports: [FormsModule]
+})
+export class HomeComponent {
+  from: string = '';
+  to: string = '';
+  departureDate: string = '';
+
+  constructor(private router: Router) {}
+
+  searchFlights() {
+    if (this.from && this.to && this.departureDate) {
+      this.router.navigate(['/search'], {
+        queryParams: { from: this.from, to: this.to, date: this.departureDate }
+      });
+    } else {
+      alert('Please fill in all fields.');
+    }
+  }
+}
+📌 3️⃣ Style the Page (home.component.css)
+You can add some styling for a better UI:
+
+css
+Copy
+Edit
+.home-container {
+  text-align: center;
+  margin-top: 50px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+label {
+  font-size: 16px;
+  margin-right: 5px;
+}
+
+input {
+  width: 200px;
+  padding: 5px;
+}
+
+.search-btn {
+  background-color: #007bff;
+  color: white;
+  padding: 10px;
+  border: none;
+  cursor: pointer;
+  border-radius: 5px;
+  margin-top: 10px;
+}
+📌 4️⃣ Add Routing for the Home Page
+In app-routes.ts, update the route:
+
+typescript
+Copy
+Edit
+import { Routes } from '@angular/router';
+
+export const appRoutes: Routes = [
+  { path: '', loadComponent: () => import('./pages/landing/landing.component').then(m => m.LandingComponent) },
+  { path: 'home', loadComponent: () => import('./pages/home/home.component').then(m => m.HomeComponent) },
+  { path: 'search', loadComponent: () => import('./pages/search/search.component').then(m => m.SearchComponent) },
+  { path: 'admin/login', loadComponent: () => import('./pages/admin/login/login.component').then(m => m.LoginComponent) },
+  { path: '**', redirectTo: '' } // Redirect unknown routes to landing page
+];
+📌 5️⃣ Test the Page
+Run the project again and go to /home.
+Try entering From, To, and Date, then click Search. It should navigate to /search with query parameters.
+
+📌 Next Steps
+Now, let's create the Search Results Page (/search) to display available flights.
+
+Run this command:
+
+sh
+Copy
+Edit
+ng generate component pages/search --standalone
+Let me know once done! 🚀
+
+You said:
+Can you use bootstrap for styling
+ChatGPT said:
+Yes! Let's use Bootstrap for styling the Home Page to make it look better.
+
+📌 1️⃣ Install Bootstrap (if not already installed)
+Run this command in the terminal:
+
+sh
+Copy
+Edit
+npm install bootstrap
+Then, add Bootstrap to angular.json under "styles":
+
+json
+Copy
+Edit
+"styles": [
+  "node_modules/bootstrap/dist/css/bootstrap.min.css",
+  "src/styles.css"
+]
+📌 2️⃣ Update home.component.html (Bootstrap Styling)
+Replace the previous UI with this Bootstrap-styled UI:
+
+html
+Copy
+Edit
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow p-4">
+        <h2 class="text-center mb-4">Search for Flights</h2>
+        <form (ngSubmit)="searchFlights()">
+          <div class="mb-3">
+            <label for="from" class="form-label">From</label>
+            <input type="text" id="from" class="form-control" [(ngModel)]="from" name="from" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="to" class="form-label">To</label>
+            <input type="text" id="to" class="form-control" [(ngModel)]="to" name="to" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="date" class="form-label">Departure Date</label>
+            <input type="date" id="date" class="form-control" [(ngModel)]="departureDate" name="date" required>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">Search Flights</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+📌 3️⃣ Update home.component.css (Optional)
+Since Bootstrap handles most of the styling, we only add a background:
+
+css
+Copy
+Edit
+body {
+  background-color: #f8f9fa;
+}
+📌 4️⃣ Test the Page
+Run:
+
+sh
+Copy
+Edit
+ng serve --open
+The Home Page should now have a Bootstrap-styled flight search form.
+
+📌 Next Steps
+Now, let’s build the Search Results Page (/search) using Bootstrap.
+
+Run this command:
+
+sh
+Copy
+Edit
+ng generate component pages/search --standalone
+Let me know once done! 🚀
+
+You said:
+done
+ChatGPT said:
+Great! Now let's build the Search Results Page (/search) where users will see available flights.
+
+📌 1️⃣ Update search.component.html (Bootstrap Table for Flights)
+Replace the default content with this Bootstrap-styled table:
+
+html
+Copy
+Edit
+<div class="container mt-5">
+  <h2 class="text-center mb-4">Available Flights</h2>
+
+  <div *ngIf="flights.length > 0; else noFlights">
+    <table class="table table-striped table-bordered">
+      <thead class="table-dark">
+        <tr>
+          <th>Flight No</th>
+          <th>Airline</th>
+          <th>Departure</th>
+          <th>Arrival</th>
+          <th>Price</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let flight of flights">
+          <td>{{ flight.flightNumber }}</td>
+          <td>{{ flight.airline }}</td>
+          <td>{{ flight.departure }}</td>
+          <td>{{ flight.arrival }}</td>
+          <td>₹{{ flight.price }}</td>
+          <td><button class="btn btn-success" (click)="bookFlight(flight)">Book</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ng-template #noFlights>
+    <p class="text-center text-danger">No flights available for the selected route.</p>
+  </ng-template>
+</div>
+📌 2️⃣ Update search.component.ts (Fetch and Display Flights)
+typescript
+Copy
+Edit
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+
+@Component({
+  selector: 'app-search',
+  standalone: true,
+  templateUrl: './search.component.html',
+  styleUrls: ['./search.component.css'],
+  imports: [CommonModule]
+})
+export class SearchComponent implements OnInit {
+  from: string = '';
+  to: string = '';
+  departureDate: string = '';
+  flights: any[] = [];
+
+  constructor(private route: ActivatedRoute, private router: Router) {}
+
+  ngOnInit() {
+    this.route.queryParams.subscribe(params => {
+      this.from = params['from'];
+      this.to = params['to'];
+      this.departureDate = params['date'];
+      this.fetchFlights();
+    });
+  }
+
+  fetchFlights() {
+    // Dummy flight data (Replace this with API call later)
+    this.flights = [
+      { flightNumber: 'AI-202', airline: 'Air India', departure: '10:00 AM', arrival: '12:00 PM', price: 4500 },
+      { flightNumber: 'IN-101', airline: 'IndiGo', departure: '1:00 PM', arrival: '3:00 PM', price: 4000 },
+      { flightNumber: 'SG-502', airline: 'SpiceJet', departure: '6:00 PM', arrival: '8:00 PM', price: 4200 }
+    ];
+  }
+
+  bookFlight(flight: any) {
+    this.router.navigate(['/booking'], { queryParams: { flight: JSON.stringify(flight) } });
+  }
+}
+📌 3️⃣ Add Routing for Search Page (app-routes.ts)
+Ensure app-routes.ts has this entry:
+
+typescript
+Copy
+Edit
+{ path: 'search', loadComponent: () => import('./pages/search/search.component').then(m => m.SearchComponent) }
+📌 4️⃣ Test the Page
+Go to Home Page (/home)
+Enter From, To, and Date, then click Search
+It should navigate to /search and display flight results
+📌 Next Steps
+Now, let’s create the Booking Page (/booking).
+
+Run this command:
+
+sh
+Copy
+Edit
+ng generate component pages/booking --standalone
+Let me know once done! 🚀
+
+You said:
+done
+ChatGPT said:
+Great! Now, let’s build the Booking Page (/booking), where users can enter passenger details and confirm their booking.
+
+📌 1️⃣ Update booking.component.html (Passenger Form)
+Replace the default content with this Bootstrap-styled booking form:
+
+html
+Copy
+Edit
+<div class="container mt-5">
+  <div class="card shadow p-4">
+    <h2 class="text-center mb-4">Flight Booking</h2>
+
+    <div class="mb-3">
+      <h5>Flight Details:</h5>
+      <p><strong>Flight No:</strong> {{ flight?.flightNumber }}</p>
+      <p><strong>Airline:</strong> {{ flight?.airline }}</p>
+      <p><strong>Departure:</strong> {{ flight?.departure }}</p>
+      <p><strong>Arrival:</strong> {{ flight?.arrival }}</p>
+      <p><strong>Price:</strong> ₹{{ flight?.price }}</p>
+    </div>
+
+    <form (ngSubmit)="confirmBooking()">
+      <div class="mb-3">
+        <label class="form-label">Full Name</label>
+        <input type="text" class="form-control" [(ngModel)]="passengerName" name="passengerName" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-control" [(ngModel)]="email" name="email" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Phone</label>
+        <input type="text" class="form-control" [(ngModel)]="phone" name="phone" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100">Confirm Booking</button>
+    </form>
+  </div>
+</div>
+📌 2️⃣ Update booking.component.ts (Capture Flight & Passenger Data)
+typescript
+Copy
+Edit
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+
+@Component({
+  selector: 'app-booking',
+  standalone: true,
+  templateUrl: './booking.component.html',
+  styleUrls: ['./booking.component.css'],
+  imports: [CommonModule, FormsModule]
+})
+export class BookingComponent implements OnInit {
+  flight: any;
+  passengerName: string = '';
+  email: string = '';
+  phone: string = '';
+
+  constructor(private route: ActivatedRoute, private router: Router) {}
+
+  ngOnInit() {
+    this.route.queryParams.subscribe(params => {
+      this.flight = params['flight'] ? JSON.parse(params['flight']) : null;
+    });
+  }
+
+  confirmBooking() {
+    if (!this.passengerName || !this.email || !this.phone) {
+      alert('Please fill all details!');
+      return;
+    }
+
+    const bookingDetails = {
+      flight: this.flight,
+      passengerName: this.passengerName,
+      email: this.email,
+      phone: this.phone
+    };
+
+    alert('Booking Confirmed! 🎉');
+    this.router.navigate(['/confirmation'], { queryParams: { booking: JSON.stringify(bookingDetails) } });
+  }
+}
+📌 3️⃣ Add Routing for Booking Page (app-routes.ts)
+Ensure app-routes.ts has this entry:
+
+typescript
+Copy
+Edit
+{ path: 'booking', loadComponent: () => import('./pages/booking/booking.component').then(m => m.BookingComponent) }
+📌 4️⃣ Test the Page
+Search for flights on /home
+Click Book on a flight
+The form should appear on /booking
+Fill in details and Confirm Booking
+📌 Next Steps
+Now, let’s create the Booking Confirmation Page (/confirmation).
+
+Run this command:
+
+sh
+Copy
+Edit
+ng generate component pages/confirmation --standalone
+Let me know once done! 🚀
+
+You said:
+can i add multiple passengers
+ChatGPT said:
+Yes! Let’s modify the Booking Page to allow multiple passengers.
+
+📌 1️⃣ Update booking.component.html (Add Multiple Passengers)
+Replace the form section with dynamic passenger inputs:
+
+html
+Copy
+Edit
+<div class="container mt-5">
+  <div class="card shadow p-4">
+    <h2 class="text-center mb-4">Flight Booking</h2>
+
+    <div class="mb-3">
+      <h5>Flight Details:</h5>
+      <p><strong>Flight No:</strong> {{ flight?.flightNumber }}</p>
+      <p><strong>Airline:</strong> {{ flight?.airline }}</p>
+      <p><strong>Departure:</strong> {{ flight?.departure }}</p>
+      <p><strong>Arrival:</strong> {{ flight?.arrival }}</p>
+      <p><strong>Price per Passenger:</strong> ₹{{ flight?.price }}</p>
+    </div>
+
+    <form (ngSubmit)="confirmBooking()">
+      <div *ngFor="let passenger of passengers; let i = index" class="mb-4 border p-3 rounded">
+        <h5>Passenger {{ i + 1 }}</h5>
+
+        <div class="mb-3">
+          <label class="form-label">Full Name</label>
+          <input type="text" class="form-control" [(ngModel)]="passenger.name" name="passengerName{{i}}" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-control" [(ngModel)]="passenger.email" name="passengerEmail{{i}}" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Phone</label>
+          <input type="text" class="form-control" [(ngModel)]="passenger.phone" name="passengerPhone{{i}}" required>
+        </div>
+
+        <button type="button" class="btn btn-danger btn-sm" (click)="removePassenger(i)" *ngIf="passengers.length > 1">
+          Remove Passenger
+        </button>
+      </div>
+
+      <button type="button" class="btn btn-secondary" (click)="addPassenger()">+ Add Another Passenger</button>
+      
+      <hr>
+      
+      <h5>Total Price: ₹{{ passengers.length * flight?.price }}</h5>
+
+      <button type="submit" class="btn btn-primary w-100 mt-3">Confirm Booking</button>
+    </form>
+  </div>
+</div>
+📌 2️⃣ Update booking.component.ts (Handle Multiple Passengers)
+typescript
+Copy
+Edit
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+
+@Component({
+  selector: 'app-booking',
+  standalone: true,
+  templateUrl: './booking.component.html',
+  styleUrls: ['./booking.component.css'],
+  imports: [CommonModule, FormsModule]
+})
+export class BookingComponent implements OnInit {
+  flight: any;
+  passengers: any[] = [];
+
+  constructor(private route: ActivatedRoute, private router: Router) {}
+
+  ngOnInit() {
+    this.route.queryParams.subscribe(params => {
+      this.flight = params['flight'] ? JSON.parse(params['flight']) : null;
+      this.addPassenger(); // Add at least one passenger by default
+    });
+  }
+
+  addPassenger() {
+    this.passengers.push({ name: '', email: '', phone: '' });
+  }
+
+  removePassenger(index: number) {
+    this.passengers.splice(index, 1);
+  }
+
+  confirmBooking() {
+    if (this.passengers.some(p => !p.name || !p.email || !p.phone)) {
+      alert('Please fill all details for every passenger!');
+      return;
+    }
+
+    const bookingDetails = {
+      flight: this.flight,
+      passengers: this.passengers
+    };
+
+    alert('Booking Confirmed! 🎉');
+    this.router.navigate(['/confirmation'], { queryParams: { booking: JSON.stringify(bookingDetails) } });
+  }
+}
+📌 3️⃣ Test the Page
+Search for flights on /home
+Click Book on a flight
+Add multiple passengers and enter their details
+The Total Price should update dynamically
+Click Confirm Booking
+📌 Next Steps
+Now, let’s create the Booking Confirmation Page (/confirmation).
+
+Run this command:
+
+sh
+Copy
+Edit
+ng generate component pages/confirmation --standalone
+Let me know once done! 🚀
+
+You said:
+done
+ChatGPT said:
+Great! Now, let’s build the Booking Confirmation Page (/confirmation), where users can see their booking details after confirmation.
+
+📌 1️⃣ Update confirmation.component.html (Display Booking Details)
+Replace the default content with this Bootstrap-styled confirmation page:
+
+html
+Copy
+Edit
+<div class="container mt-5">
+  <div class="card shadow p-4 text-center">
+    <h2 class="text-success">Booking Confirmed! 🎉</h2>
+    <p class="text-muted">Your flight has been successfully booked.</p>
+
+    <div class="mb-4">
+      <h4>Flight Details</h4>
+      <p><strong>Flight No:</strong> {{ booking?.flight?.flightNumber }}</p>
+      <p><strong>Airline:</strong> {{ booking?.flight?.airline }}</p>
+      <p><strong>Departure:</strong> {{ booking?.flight?.departure }}</p>
+      <p><strong>Arrival:</strong> {{ booking?.flight?.arrival }}</p>
+    </div>
+
+    <div class="mb-4">
+      <h4>Passengers</h4>
+      <ul class="list-group">
+        <li class="list-group-item" *ngFor="let passenger of booking?.passengers; let i = index">
+          <strong>Passenger {{ i + 1 }}:</strong> {{ passenger.name }} | {{ passenger.email }} | {{ passenger.phone }}
+        </li>
+      </ul>
+    </div>
+
+    <h4>Total Price: ₹{{ booking?.passengers?.length * booking?.flight?.price }}</h4>
+
+    <button class="btn btn-primary mt-3" (click)="goHome()">Back to Home</button>
+  </div>
+</div>
+📌 2️⃣ Update confirmation.component.ts (Capture Booking Data)
+typescript
+Copy
+Edit
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+
+@Component({
+  selector: 'app-confirmation',
+  standalone: true,
+  templateUrl: './confirmation.component.html',
+  styleUrls: ['./confirmation.component.css'],
+  imports: [CommonModule]
+})
+export class ConfirmationComponent implements OnInit {
+  booking: any;
+
+  constructor(private route: ActivatedRoute, private router: Router) {}
+
+  ngOnInit() {
+    this.route.queryParams.subscribe(params => {
+      this.booking = params['booking'] ? JSON.parse(params['booking']) : null;
+    });
+  }
+
+  goHome() {
+    this.router.navigate(['/home']);
+  }
+}
+📌 3️⃣ Add Routing for Confirmation Page (app-routes.ts)
+Ensure app-routes.ts has this entry:
+
+typescript
+Copy
+Edit
+{ path: 'confirmation', loadComponent: () => import('./pages/confirmation/confirmation.component').then(m => m.ConfirmationComponent) }
+📌 4️⃣ Test the Page
+Search for flights on /home
+Click Book on a flight
+Add multiple passengers and confirm booking
+The confirmation page should display all flight & passenger details
+Click Back to Home
+🎯 Next Steps
+Now, let's integrate API calls to store booking details in the backend. Let me know once you’re ready! 🚀
+
+You said:
+done
+ChatGPT said:
+Awesome! Now, let's integrate API calls to store booking details in your Flights Application Backend using Angular HTTP Client.
+
+📌 1️⃣ Create booking.service.ts (Handle API Calls)
+Run this command to generate the service:
+
+sh
+Copy
+Edit
+ng generate service services/booking
+Then, update booking.service.ts:
+
+typescript
+Copy
+Edit
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class BookingService {
+  private apiUrl = 'http://localhost:5000/api/bookings'; // Update this with your actual backend URL
+
+  constructor(private http: HttpClient) {}
+
+  createBooking(bookingData: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/create`, bookingData);
+  }
+
+  getBooking(referenceNumber: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/${referenceNumber}`);
+  }
+}
+📌 2️⃣ Inject Service into booking.component.ts
+Now, modify booking.component.ts to call the API when confirming a booking:
+
+typescript
+Copy
+Edit
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { BookingService } from 'src/app/services/booking.service';
+
+@Component({
+  selector: 'app-booking',
+  standalone: true,
+  templateUrl: './booking.component.html',
+  styleUrls: ['./booking.component.css']
+})
+export class BookingComponent implements OnInit {
+  flight: any;
+  passengers: any[] = [];
+
+  constructor(private route: ActivatedRoute, private router: Router, private bookingService: BookingService) {}
+
+  ngOnInit() {
+    this.route.queryParams.subscribe(params => {
+      this.flight = params['flight'] ? JSON.parse(params['flight']) : null;
+      this.addPassenger(); // Add at least one passenger by default
+    });
+  }
+
+  addPassenger() {
+    this.passengers.push({ name: '', email: '', phone: '' });
+  }
+
+  removePassenger(index: number) {
+    this.passengers.splice(index, 1);
+  }
+
+  confirmBooking() {
+    if (this.passengers.some(p => !p.name || !p.email || !p.phone)) {
+      alert('Please fill all details for every passenger!');
+      return;
+    }
+
+    const bookingDetails = {
+      flightId: this.flight.id,
+      passengers: this.passengers
+    };
+
+    this.bookingService.createBooking(bookingDetails).subscribe({
+      next: (response) => {
+        alert(`Booking Confirmed! 🎉 Reference No: ${response.referenceNumber}`);
+        this.router.navigate(['/confirmation'], { queryParams: { referenceNumber: response.referenceNumber } });
+      },
+      error: (error) => {
+        console.error('Booking failed:', error);
+        alert('Booking failed. Please try again.');
+      }
+    });
+  }
+}
+📌 3️⃣ Update confirmation.component.ts (Fetch Booking from API)
+Modify confirmation.component.ts to retrieve booking details using the reference number:
+
+typescript
+Copy
+Edit
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { BookingService } from 'src/app/services/booking.service';
+
+@Component({
+  selector: 'app-confirmation',
+  standalone: true,
+  templateUrl: './confirmation.component.html',
+  styleUrls: ['./confirmation.component.css']
+})
+export class ConfirmationComponent implements OnInit {
+  booking: any;
+
+  constructor(private route: ActivatedRoute, private router: Router, private bookingService: BookingService) {}
+
+  ngOnInit() {
+    this.route.queryParams.subscribe(params => {
+      if (params['referenceNumber']) {
+        this.loadBooking(params['referenceNumber']);
+      }
+    });
+  }
+
+  loadBooking(referenceNumber: string) {
+    this.bookingService.getBooking(referenceNumber).subscribe({
+      next: (response) => {
+        this.booking = response;
+      },
+      error: (error) => {
+        console.error('Failed to load booking:', error);
+        alert('Booking details not found!');
+        this.router.navigate(['/home']);
+      }
+    });
+  }
+
+  goHome() {
+    this.router.navigate(['/home']);
+  }
+}
+📌 4️⃣ Test API Integration
+Start your backend API (dotnet run for ASP.NET Core).
+In the frontend, search for flights and book one.
+Check the console/logs to ensure the request is hitting the backend.
+Verify that a reference number is generated.
+After confirming, check the confirmation page to see if booking details are fetched from the API.
