@@ -246,3 +246,112 @@ bootstrapApplication(AppComponent, {
   ]
 }).catch(err => console.error(err));
 ✅ Enables JWT authentication for HTTP requests.
+
+
+
+
+🛠 Fixing Admin & Guest Components
+You need to generate the admin and guest components correctly as standalone components.
+
+📌 Step 1: Generate Admin & Guest Components
+Run these commands in your terminal:
+
+sh
+Copy
+Edit
+ng g c pages/admin --standalone
+ng g c pages/guest --standalone
+These commands will create:
+
+src/app/pages/admin/admin.component.ts
+src/app/pages/guest/guest.component.ts
+📌 Step 2: Check and Modify admin.component.ts
+Modify admin.component.ts to ensure it's a standalone component:
+
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-admin',
+  standalone: true,
+  templateUrl: './admin.component.html',
+  styleUrls: ['./admin.component.css']
+})
+export class AdminComponent {}
+✅ Ensures the component is correctly recognized as standalone.
+
+📌 Step 3: Modify admin.component.html
+Add a simple UI inside admin.component.html:
+
+html
+Copy
+Edit
+<div class="container">
+  <h2>Admin Dashboard</h2>
+  <p>Welcome, Admin! Manage flights and users here.</p>
+</div>
+✅ Basic UI for admin dashboard.
+
+📌 Step 4: Check and Modify guest.component.ts
+Modify guest.component.ts:
+
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-guest',
+  standalone: true,
+  templateUrl: './guest.component.html',
+  styleUrls: ['./guest.component.css']
+})
+export class GuestComponent {}
+✅ Ensures guest component is properly set up.
+
+📌 Step 5: Modify guest.component.html
+Add a simple UI inside guest.component.html:
+
+html
+Copy
+Edit
+<div class="container">
+  <h2>Guest Page</h2>
+  <p>Welcome, Guest! Browse flights here.</p>
+</div>
+✅ Basic UI for guest page.
+
+📌 Step 6: Fix app-routes.ts
+Now that the components exist, update app-routes.ts:
+
+typescript
+Copy
+Edit
+import { Routes } from '@angular/router';
+import { LoginComponent } from './components/login/login.component';
+import { NavbarComponent } from './components/navbar/navbar.component';
+import { AuthGuard } from './guards/auth.guard';
+import { AdminComponent } from './pages/admin/admin.component';
+import { GuestComponent } from './pages/guest/guest.component';
+
+export const routes: Routes = [
+  { path: '', component: NavbarComponent },
+  { path: 'login', component: LoginComponent },
+  { path: 'admin', component: AdminComponent, canActivate: [AuthGuard] },
+  { path: 'guest', component: GuestComponent }
+];
+✅ Fixes the issue by directly importing AdminComponent and GuestComponent instead of using loadComponent().
+
+🚀 Final Check
+Run the app:
+
+sh
+Copy
+Edit
+ng serve
+Then go to:
+
+http://localhost:4200/guest → Guest Page should load ✅
+http://localhost:4200/admin → Redirects to login (if not authenticated) ✅
