@@ -1,0 +1,248 @@
+1️⃣ Create the Navbar Component
+The navbar should have:
+
+Login button if the user is not logged in.
+Logout button if the user is logged in.
+Navigation links for Admin & Guest based on the authentication state.
+📌 Generate Navbar Component
+Run the command:
+
+sh
+Copy
+Edit
+ng g c components/navbar --standalone
+📌 Modify navbar.component.ts
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { AuthService } from '../../services/auth.service';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-navbar',
+  standalone: true,
+  templateUrl: './navbar.component.html',
+  styleUrls: ['./navbar.component.css']
+})
+export class NavbarComponent {
+  constructor(public authService: AuthService, private router: Router) {}
+
+  logout() {
+    this.authService.logout();
+  }
+}
+✅ Checks authentication state & provides a logout function.
+
+📌 Modify navbar.component.html
+html
+Copy
+Edit
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand" routerLink="/">Flights App</a>
+    
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/guest">Guest</a>
+        </li>
+        <li class="nav-item" *ngIf="authService.isLoggedIn()">
+          <a class="nav-link" routerLink="/admin">Admin</a>
+        </li>
+      </ul>
+      
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item" *ngIf="!authService.isLoggedIn()">
+          <a class="nav-link" routerLink="/login">Login</a>
+        </li>
+        <li class="nav-item" *ngIf="authService.isLoggedIn()">
+          <button class="btn btn-danger" (click)="logout()">Logout</button>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+✅ Displays Login for guests & Logout for logged-in users.
+
+📌 Modify navbar.component.css (Optional for styling)
+css
+Copy
+Edit
+.navbar-nav {
+  font-size: 18px;
+}
+2️⃣ Create Login Page for Admin & Guest
+Run the command:
+
+sh
+Copy
+Edit
+ng g c components/login --standalone
+📌 Modify login.component.ts
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { AuthService } from '../../services/auth.service';
+
+@Component({
+  selector: 'app-login',
+  standalone: true,
+  templateUrl: './login.component.html',
+  styleUrls: ['./login.component.css']
+})
+export class LoginComponent {
+  email = '';
+  password = '';
+
+  constructor(private authService: AuthService) {}
+
+  login() {
+    this.authService.login(this.email, this.password);
+  }
+}
+✅ Handles login by calling the authentication service.
+
+📌 Modify login.component.html
+html
+Copy
+Edit
+<div class="container">
+  <h2>Login</h2>
+  <form (submit)="login()">
+    <div class="mb-3">
+      <label>Email:</label>
+      <input type="email" [(ngModel)]="email" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label>Password:</label>
+      <input type="password" [(ngModel)]="password" class="form-control" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Login</button>
+  </form>
+</div>
+✅ Provides login form UI.
+
+3️⃣ Create Authentication Service
+Run the command:
+
+sh
+Copy
+Edit
+ng g s services/auth
+📌 Modify auth.service.ts
+typescript
+Copy
+Edit
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { BehaviorSubject } from 'rxjs';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthService {
+  private apiUrl = 'http://localhost:5000/api/auth/login';
+  private tokenKey = 'authToken';
+  isAuthenticated = new BehaviorSubject<boolean>(this.isLoggedIn());
+
+  constructor(private http: HttpClient, private router: Router) {}
+
+  login(email: string, password: string) {
+    return this.http.post<{ token: string }>(this.apiUrl, { email, password }).subscribe({
+      next: (response) => {
+        sessionStorage.setItem(this.tokenKey, response.token);
+        this.isAuthenticated.next(true);
+        this.router.navigate(['/admin']);
+      },
+      error: () => alert('Invalid credentials')
+    });
+  }
+
+  isLoggedIn(): boolean {
+    return !!sessionStorage.getItem(this.tokenKey);
+  }
+
+  logout() {
+    sessionStorage.removeItem(this.tokenKey);
+    this.isAuthenticated.next(false);
+    this.router.navigate(['/login']);
+  }
+
+  getToken(): string | null {
+    return sessionStorage.getItem(this.tokenKey);
+  }
+}
+✅ Handles authentication, stores JWT, and manages login/logout.
+
+4️⃣ Add Routes in app-routes.ts
+Modify app-routes.ts to include login and admin routes:
+
+typescript
+Copy
+Edit
+import { Routes } from '@angular/router';
+import { LoginComponent } from './components/login/login.component';
+import { NavbarComponent } from './components/navbar/navbar.component';
+import { AuthGuard } from './guards/auth.guard';
+
+export const routes: Routes = [
+  { path: '', component: NavbarComponent },
+  { path: 'login', component: LoginComponent },
+  { path: 'admin', loadComponent: () => import('./pages/admin/admin.component').then(m => m.AdminComponent), canActivate: [AuthGuard] },
+  { path: 'guest', loadComponent: () => import('./pages/guest/guest.component').then(m => m.GuestComponent) }
+];
+✅ Restricts access to /admin unless authenticated.
+
+5️⃣ Create Auth Guard
+Run the command:
+
+sh
+Copy
+Edit
+ng g g guards/auth
+📌 Modify auth.guard.ts
+typescript
+Copy
+Edit
+import { Injectable } from '@angular/core';
+import { CanActivate, Router } from '@angular/router';
+import { AuthService } from '../services/auth.service';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthGuard implements CanActivate {
+  constructor(private authService: AuthService, private router: Router) {}
+
+  canActivate(): boolean {
+    if (!this.authService.isLoggedIn()) {
+      this.router.navigate(['/login']);
+      return false;
+    }
+    return true;
+  }
+}
+✅ Prevents unauthenticated users from accessing /admin.
+
+6️⃣ Secure API Requests
+Modify main.ts to include an HTTP Interceptor:
+
+typescript
+Copy
+Edit
+import { bootstrapApplication } from '@angular/platform-browser';
+import { provideRouter } from '@angular/router';
+import { withInterceptorsFromDi, provideHttpClient } from '@angular/common/http';
+import { AppComponent } from './app/app.component';
+import { routes } from './app/app-routes';
+
+bootstrapApplication(AppComponent, {
+  providers: [
+    provideRouter(routes),
+    provideHttpClient(withInterceptorsFromDi())
+  ]
+}).catch(err => console.error(err));
+✅ Enables JWT authentication for HTTP requests.
