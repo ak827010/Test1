@@ -1,0 +1,582 @@
+📌 Updated Plan (Keep Flight Search in Home Component)
+1️⃣ Features in home.component.ts
+Dropdown city search (calls api/city/search/{query})
+Validation for required fields
+Shows flight search results below the form
+Navigates to booking when a flight is selected
+📌 2️⃣ Update home.component.html (UI + Validations)
+html
+Copy
+Edit
+<div class="container mt-4">
+  <div class="card shadow p-4">
+    <h2 class="text-center">Search Flights</h2>
+
+    <form #searchForm="ngForm" (ngSubmit)="searchFlights()">
+      <!-- From City -->
+      <div class="mb-3 position-relative">
+        <label for="fromCity" class="form-label">From</label>
+        <input
+          type="text"
+          id="fromCity"
+          class="form-control"
+          [(ngModel)]="fromCityQuery"
+          name="fromCity"
+          required
+          #fromCityRef="ngModel"
+          (input)="fetchCities('from')"
+          autocomplete="off"
+        />
+        <div *ngIf="fromCityRef.invalid && fromCityRef.touched" class="text-danger">
+          From city is required.
+        </div>
+
+        <!-- City Suggestions -->
+        <ul *ngIf="filteredFromCities.length" class="list-group position-absolute w-100">
+          <li
+            *ngFor="let city of filteredFromCities"
+            class="list-group-item list-group-item-action"
+            (click)="selectCity(city, 'from')"
+          >
+            {{ city.name }} ({{ city.code }})
+          </li>
+        </ul>
+      </div>
+
+      <!-- To City -->
+      <div class="mb-3 position-relative">
+        <label for="toCity" class="form-label">To</label>
+        <input
+          type="text"
+          id="toCity"
+          class="form-control"
+          [(ngModel)]="toCityQuery"
+          name="toCity"
+          required
+          #toCityRef="ngModel"
+          (input)="fetchCities('to')"
+          autocomplete="off"
+        />
+        <div *ngIf="toCityRef.invalid && toCityRef.touched" class="text-danger">
+          To city is required.
+        </div>
+
+        <!-- City Suggestions -->
+        <ul *ngIf="filteredToCities.length" class="list-group position-absolute w-100">
+          <li
+            *ngFor="let city of filteredToCities"
+            class="list-group-item list-group-item-action"
+            (click)="selectCity(city, 'to')"
+          >
+            {{ city.name }} ({{ city.code }})
+          </li>
+        </ul>
+      </div>
+
+      <!-- Departure Date -->
+      <div class="mb-3">
+        <label for="departureDate" class="form-label">Departure Date</label>
+        <input
+          type="date"
+          id="departureDate"
+          class="form-control"
+          [(ngModel)]="departureDate"
+          name="departureDate"
+          required
+          min="{{ minDate }}"
+          #departureDateRef="ngModel"
+        />
+        <div *ngIf="departureDateRef.invalid && departureDateRef.touched" class="text-danger">
+          Departure date is required and cannot be in the past.
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100" [disabled]="searchForm.invalid">Search Flights</button>
+    </form>
+  </div>
+
+  <!-- Search Results -->
+  <div *ngIf="flights.length" class="mt-4">
+    <h3 class="text-center">Available Flights</h3>
+    <div class="list-group">
+      <div *ngFor="let flight of flights" class="list-group-item d-flex justify-content-between align-items-center">
+        <div>
+          <h5>{{ flight.airline }} ({{ flight.flightNumber }})</h5>
+          <p>{{ flight.from }} → {{ flight.to }} | Departure: {{ flight.departureTime }}</p>
+        </div>
+        <button class="btn btn-success" (click)="bookFlight(flight)">Book</button>
+      </div>
+    </div>
+  </div>
+</div>
+📌 3️⃣ Update home.component.ts (Search + City API)
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { CityService } from 'src/app/services/city.service';
+import { FlightService } from 'src/app/services/flight.service';
+
+@Component({
+  selector: 'app-home',
+  standalone: true,
+  templateUrl: './home.component.html',
+  styleUrls: ['./home.component.css']
+})
+export class HomeComponent {
+  fromCityQuery = '';
+  toCityQuery = '';
+  departureDate = '';
+
+  filteredFromCities: any[] = [];
+  filteredToCities: any[] = [];
+
+  selectedFromCity: any = null;
+  selectedToCity: any = null;
+
+  flights: any[] = [];
+
+  minDate: string = '';
+
+  constructor(private cityService: CityService, private flightService: FlightService, private router: Router) {
+    // Set the minimum date (today's date)
+    const today = new Date();
+    this.minDate = today.toISOString().split('T')[0]; // Format YYYY-MM-DD
+  }
+
+  fetchCities(type: 'from' | 'to') {
+    const query = type === 'from' ? this.fromCityQuery : this.toCityQuery;
+    if (query.length < 2) return; // Prevent unnecessary API calls
+
+    this.cityService.searchCities(query).subscribe({
+      next: (cities) => {
+        if (type === 'from') {
+          this.filteredFromCities = cities;
+        } else {
+          this.filteredToCities = cities;
+        }
+      },
+      error: (error) => console.error('Error fetching cities:', error)
+    });
+  }
+
+  selectCity(city: any, type: 'from' | 'to') {
+    if (type === 'from') {
+      this.selectedFromCity = city;
+      this.fromCityQuery = `${city.name} (${city.code})`;
+      this.filteredFromCities = [];
+    } else {
+      this.selectedToCity = city;
+      this.toCityQuery = `${city.name} (${city.code})`;
+      this.filteredToCities = [];
+    }
+  }
+
+  searchFlights() {
+    if (!this.selectedFromCity || !this.selectedToCity || !this.departureDate) {
+      alert('Please select valid cities and a date!');
+      return;
+    }
+
+    this.flightService.getFlights(this.selectedFromCity.code, this.selectedToCity.code, this.departureDate).subscribe({
+      next: (flights) => {
+        this.flights = flights;
+      },
+      error: (error) => console.error('Error fetching flights:', error)
+    });
+  }
+
+  bookFlight(flight: any) {
+    this.router.navigate(['/booking'], { queryParams: { flightId: flight.id } });
+  }
+}
+📌 4️⃣ Update city.service.ts (City API Call)
+typescript
+Copy
+Edit
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class CityService {
+  private baseUrl = 'http://localhost:5000/api/city/search'; // Adjust API base URL
+
+  constructor(private http: HttpClient) {}
+
+  searchCities(query: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/${query}`);
+  }
+}
+📌 5️⃣ Update flight.service.ts (Flight Search API)
+typescript
+Copy
+Edit
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class FlightService {
+  private baseUrl = 'http://localhost:5000/api/flight'; // Adjust API base URL
+
+  constructor(private http: HttpClient) {}
+
+  getFlights(from: string, to: string, date: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/search?from=${from}&to=${to}&date=${date}`);
+  }
+}
+🎯 Next Steps
+✅ Now flight search works in home.component.ts with validations.
+✅ City search dropdown integrated using api/city/search/{query}.
+✅ Fluent validation for cities + departure date.
+✅ Booking navigation is ready.
+
+Let me know if you want any modifications! 🚀
+
+You said:
+Flight service will be called when user will hit search flight button how the result will be displayed in search component
+ChatGPT said:
+You're right! Let's keep the search logic in the HomeComponent, but display the flight results in the SearchComponent instead of HomeComponent.
+
+📌 Updated Plan
+Search Flights in HomeComponent:
+
+Take From, To, Date inputs.
+Fetch flight results when clicking Search Flights.
+Pass the search results to SearchComponent.
+Display Flights in SearchComponent:
+
+Fetch the search results from HomeComponent.
+Display the results in a structured Bootstrap-styled card layout.
+📌 1️⃣ Update home.component.ts (Search + Emit Event)
+typescript
+Copy
+Edit
+import { Component, EventEmitter, Output } from '@angular/core';
+import { CityService } from 'src/app/services/city.service';
+import { FlightService } from 'src/app/services/flight.service';
+
+@Component({
+  selector: 'app-home',
+  standalone: true,
+  templateUrl: './home.component.html',
+  styleUrls: ['./home.component.css']
+})
+export class HomeComponent {
+  fromCityQuery = '';
+  toCityQuery = '';
+  departureDate = '';
+  flights: any[] = [];
+
+  filteredFromCities: any[] = [];
+  filteredToCities: any[] = [];
+  selectedFromCity: any = null;
+  selectedToCity: any = null;
+
+  minDate: string = '';
+
+  @Output() flightSearchEvent = new EventEmitter<any[]>(); // Emit search results
+
+  constructor(private cityService: CityService, private flightService: FlightService) {
+    const today = new Date();
+    this.minDate = today.toISOString().split('T')[0];
+  }
+
+  fetchCities(type: 'from' | 'to') {
+    const query = type === 'from' ? this.fromCityQuery : this.toCityQuery;
+    if (query.length < 2) return;
+
+    this.cityService.searchCities(query).subscribe({
+      next: (cities) => {
+        if (type === 'from') this.filteredFromCities = cities;
+        else this.filteredToCities = cities;
+      },
+      error: (error) => console.error('Error fetching cities:', error)
+    });
+  }
+
+  selectCity(city: any, type: 'from' | 'to') {
+    if (type === 'from') {
+      this.selectedFromCity = city;
+      this.fromCityQuery = `${city.name} (${city.code})`;
+      this.filteredFromCities = [];
+    } else {
+      this.selectedToCity = city;
+      this.toCityQuery = `${city.name} (${city.code})`;
+      this.filteredToCities = [];
+    }
+  }
+
+  searchFlights() {
+    if (!this.selectedFromCity || !this.selectedToCity || !this.departureDate) {
+      alert('Please select valid cities and a date!');
+      return;
+    }
+
+    this.flightService.getFlights(this.selectedFromCity.code, this.selectedToCity.code, this.departureDate).subscribe({
+      next: (flights) => {
+        this.flights = flights;
+        this.flightSearchEvent.emit(this.flights); // Emit the result
+      },
+      error: (error) => console.error('Error fetching flights:', error)
+    });
+  }
+}
+📌 2️⃣ Update search.component.ts (Receive & Display Flights)
+typescript
+Copy
+Edit
+import { Component, Input } from '@angular/core';
+
+@Component({
+  selector: 'app-search',
+  standalone: true,
+  templateUrl: './search.component.html',
+  styleUrls: ['./search.component.css']
+})
+export class SearchComponent {
+  @Input() flights: any[] = []; // Receive search results
+}
+📌 3️⃣ Update search.component.html (Display Results)
+html
+Copy
+Edit
+<div class="container mt-3">
+  <h3 class="text-center">Available Flights</h3>
+  <div class="row">
+    <div *ngFor="let flight of flights" class="col-md-4">
+      <div class="card shadow p-3 mb-3">
+        <div class="card-body">
+          <h5 class="card-title">{{ flight.airline }} ({{ flight.flightNumber }})</h5>
+          <p class="card-text">
+            <strong>{{ flight.from }}</strong> → <strong>{{ flight.to }}</strong><br />
+            Departure: {{ flight.departureTime }}<br />
+            Price: ₹{{ flight.price }}
+          </p>
+          <button class="btn btn-success w-100">Book Now</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+📌 4️⃣ Update app.component.html (Include Both Components)
+html
+Copy
+Edit
+<app-home (flightSearchEvent)="searchResults = $event"></app-home>
+<app-search [flights]="searchResults"></app-search>
+✅ Summary
+✔ User enters cities & date in HomeComponent
+✔ Search button calls API & emits flight results
+✔ SearchComponent receives results & displays them
+✔ Flights are shown in Bootstrap-styled cards
+
+Now, the Home Component handles searching, and the Search Component handles displaying results! 🚀
+Let me know if you need modifications. 😊
+
+You said:
+<app-home (flightSearchEvent)="searchResults = $event"></app-home>
+<app-search [flights]="searchResults"></app-search>
+Do i have to write <router-outlet>?
+
+ChatGPT said:
+Yes! If you are navigating between different pages, you should use <router-outlet>, but if you want to display both components on the same page, then using <app-home> and <app-search> directly is fine.
+
+📌 When to Use <router-outlet>?
+Use <router-outlet> when you want: ✅ A separate Search Page (e.g., /search-results)
+✅ To keep the URL updated (/search-results?from=BOM&to=DEL)
+✅ Better navigation experience
+
+📌 When NOT to Use <router-outlet>?
+❌ If you want both components to be visible on the same page
+❌ If you don't need page navigation
+
+✅ Option 1: Using <router-outlet> (Recommended for Page Navigation)
+Modify app.component.html:
+
+html
+Copy
+Edit
+<router-outlet></router-outlet>
+Update app-routes.ts:
+
+typescript
+Copy
+Edit
+import { Routes } from '@angular/router';
+import { HomeComponent } from './components/home/home.component';
+import { SearchComponent } from './components/search/search.component';
+
+export const appRoutes: Routes = [
+  { path: '', component: HomeComponent },
+  { path: 'search-results', component: SearchComponent }
+];
+Modify home.component.ts (Navigate to Search Page):
+
+typescript
+Copy
+Edit
+import { Router } from '@angular/router';
+
+constructor(private router: Router, private flightService: FlightService) {}
+
+searchFlights() {
+  if (!this.selectedFromCity || !this.selectedToCity || !this.departureDate) {
+    alert('Please select valid cities and a date!');
+    return;
+  }
+
+  this.flightService.getFlights(this.selectedFromCity.code, this.selectedToCity.code, this.departureDate).subscribe({
+    next: (flights) => {
+      this.router.navigate(['/search-results'], { state: { flights } });
+    },
+    error: (error) => console.error('Error fetching flights:', error)
+  });
+}
+Modify search.component.ts (Retrieve Data from Navigation State):
+
+typescript
+Copy
+Edit
+import { ActivatedRoute, Router } from '@angular/router';
+
+constructor(private router: Router) {
+  const navigation = this.router.getCurrentNavigation();
+  this.flights = navigation?.extras.state?.['flights'] || [];
+}
+✅ Option 2: Using <app-home> and <app-search> Together (No Routing)
+If you don't want to navigate to a different page, just use:
+
+html
+Copy
+Edit
+<app-home (flightSearchEvent)="searchResults = $event"></app-home>
+<app-search [flights]="searchResults"></app-search>
+✔ This keeps everything on the same page.
+
+💡 Which One to Choose?
+If you want a separate search results page → Use <router-outlet>.
+If you want to show results on the same page → Use <app-home> and <app-search>.
+Let me know how you want to proceed! 🚀
+
+You said:
+ want a separate search results page → Use <router-outlet>
+ChatGPT said:
+Great! Since you want a separate search results page, we'll use Angular Routing with <router-outlet>.
+
+✅ Steps to Implement Search Page Navigation
+We'll make sure that:
+✔ User searches for flights in HomeComponent
+✔ User is navigated to SearchComponent with flight results
+✔ SearchComponent displays flights
+
+1️⃣ Add <router-outlet> in app.component.html
+Replace existing content with:
+
+html
+Copy
+Edit
+<router-outlet></router-outlet>
+✅ This will load the current route’s component dynamically.
+
+2️⃣ Define Routes in app-routes.ts
+typescript
+Copy
+Edit
+import { Routes } from '@angular/router';
+import { HomeComponent } from './components/home/home.component';
+import { SearchComponent } from './components/search/search.component';
+
+export const appRoutes: Routes = [
+  { path: '', component: HomeComponent },  // Default page
+  { path: 'search-results', component: SearchComponent }
+];
+✅ Now, we have /search-results route for displaying flight results.
+
+3️⃣ Modify home.component.ts to Navigate with Flight Data
+typescript
+Copy
+Edit
+import { Router } from '@angular/router';
+import { FlightService } from '../../services/flight.service';
+
+constructor(private router: Router, private flightService: FlightService) {}
+
+searchFlights() {
+  if (!this.selectedFromCity || !this.selectedToCity || !this.departureDate) {
+    alert('Please select valid cities and a date!');
+    return;
+  }
+
+  this.flightService.getFlights(this.selectedFromCity.code, this.selectedToCity.code, this.departureDate).subscribe({
+    next: (flights) => {
+      this.router.navigate(['/search-results'], { state: { flights } });
+    },
+    error: (error) => console.error('Error fetching flights:', error)
+  });
+}
+✅ When user clicks "Search Flights", it will navigate to /search-results with flight data.
+
+4️⃣ Modify search.component.ts to Get Flight Data
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+
+@Component({
+  selector: 'app-search',
+  templateUrl: './search.component.html',
+  styleUrls: ['./search.component.css']
+})
+export class SearchComponent {
+  flights: any[] = [];
+
+  constructor(private router: Router) {
+    const navigation = this.router.getCurrentNavigation();
+    this.flights = navigation?.extras.state?.['flights'] || [];
+  }
+}
+✅ This ensures that flight results are available in the search page.
+
+5️⃣ Modify search.component.html to Display Flights
+html
+Copy
+Edit
+<h2>Flight Search Results</h2>
+
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Flight</th>
+      <th>Departure</th>
+      <th>Arrival</th>
+      <th>Fare</th>
+      <th>Book</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr *ngFor="let flight of flights">
+      <td>{{ flight.flightNumber }}</td>
+      <td>{{ flight.departureTime }}</td>
+      <td>{{ flight.arrivalTime }}</td>
+      <td>₹{{ flight.fare }}</td>
+      <td>
+        <button class="btn btn-primary">Book Now</button>
+      </td>
+    </tr>
+  </tbody>
+</table>
+✅ Displays flight details in a Bootstrap table.
+
+🎯 Final Flow
+1️⃣ User enters "From City", "To City", and "Date" on Home Page
+2️⃣ Clicks "Search Flights"
+3️⃣ API is called → Flights fetched → Navigates to /search-results
+4️⃣ Search Page displays flights in a table
