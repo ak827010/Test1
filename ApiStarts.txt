@@ -926,3 +926,240 @@ Console logs flight search details. (Will later be connected to Flight API)
 2️⃣ Clicks "Search Flights"
 3️⃣ API is called → Flights fetched → Navigates to /search-results
 4️⃣ Search Page displays flights in a table
+
+
+
+
+
+
+
+
+
+1️⃣ Update city.service.ts
+Create a service to fetch cities from api/city/all and filter results.
+
+📂 src/app/services/city.service.ts
+
+typescript
+Copy
+Edit
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class CityService {
+  private baseUrl = 'api/city';
+
+  constructor(private http: HttpClient) {}
+
+  // Fetch all cities when the component loads
+  getAllCities(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.baseUrl}/all`);
+  }
+}
+
+
+Write html for whole from city , to city, and departure also use validations on that also don't allow same cities in both to and from city column
+ChatGPT said:
+Here’s the full HTML for From City, To City, and Departure Date with the following features:
+
+✅ Dynamic City Search: Shows all cities on focus and filters based on input.
+✅ Validation Rules:
+
+Required: User must select both "From" and "To" cities.
+Different Cities: "To City" cannot be the same as "From City".
+Valid Date Selection: The departure date must be today or a future date.
+📌 Full home.component.html
+html
+Copy
+Edit
+<div class="container mt-4">
+  <h2 class="text-center">Search Flights</h2>
+
+  <form #flightForm="ngForm">
+    <!-- From City -->
+    <div class="form-group">
+      <label for="fromCity">From City</label>
+      <input type="text" id="fromCity" class="form-control"
+             [(ngModel)]="fromCity" name="fromCity"
+             (focus)="onCityFocus('from')" (input)="onCityInput(fromCity, 'from')"
+             placeholder="Enter city name"
+             required>
+      <!-- Error: Required -->
+      <div *ngIf="flightForm.submitted && !fromCity" class="text-danger">From City is required.</div>
+      <!-- Dropdown for selecting city -->
+      <ul class="dropdown-menu show" *ngIf="filteredFromCities.length">
+        <li *ngFor="let city of filteredFromCities" (click)="selectCity(city, 'from')">
+          {{ city }}
+        </li>
+      </ul>
+    </div>
+
+    <!-- To City -->
+    <div class="form-group mt-3">
+      <label for="toCity">To City</label>
+      <input type="text" id="toCity" class="form-control"
+             [(ngModel)]="toCity" name="toCity"
+             (focus)="onCityFocus('to')" (input)="onCityInput(toCity, 'to')"
+             placeholder="Enter city name"
+             required>
+      <!-- Error: Required -->
+      <div *ngIf="flightForm.submitted && !toCity" class="text-danger">To City is required.</div>
+      <!-- Error: Cities cannot be the same -->
+      <div *ngIf="toCity && fromCity && fromCity === toCity" class="text-danger">
+        From City and To City cannot be the same.
+      </div>
+      <!-- Dropdown for selecting city -->
+      <ul class="dropdown-menu show" *ngIf="filteredToCities.length">
+        <li *ngFor="let city of filteredToCities" (click)="selectCity(city, 'to')">
+          {{ city }}
+        </li>
+      </ul>
+    </div>
+
+    <!-- Departure Date -->
+    <div class="form-group mt-3">
+      <label for="departureDate">Departure Date</label>
+      <input type="date" id="departureDate" class="form-control"
+             [(ngModel)]="departureDate" name="departureDate"
+             [min]="today"
+             required>
+      <!-- Error: Required -->
+      <div *ngIf="flightForm.submitted && !departureDate" class="text-danger">
+        Departure Date is required.
+      </div>
+    </div>
+
+    <!-- Search Button -->
+    <button type="submit" class="btn btn-primary mt-4" (click)="onSearch(flightForm)">
+      Search Flights
+    </button>
+  </form>
+</div>
+📌 Add to home.component.ts
+Handles:
+✔ Fetching all cities
+✔ Filtering dynamically based on input
+✔ Preventing same city selection
+✔ Setting min departure date
+
+typescript
+Copy
+Edit
+import { Component, OnInit } from '@angular/core';
+import { CityService } from 'src/app/services/city.service';
+
+@Component({
+  selector: 'app-home',
+  templateUrl: './home.component.html',
+  styleUrls: ['./home.component.css']
+})
+export class HomeComponent implements OnInit {
+  cities: string[] = []; // Full list of cities
+  filteredFromCities: string[] = [];
+  filteredToCities: string[] = [];
+  fromCity: string = '';
+  toCity: string = '';
+  departureDate: string = '';
+
+  today: string = ''; // Stores today's date
+
+  constructor(private cityService: CityService) {}
+
+  ngOnInit(): void {
+    // Get today's date (for min departure date)
+    const todayDate = new Date();
+    this.today = todayDate.toISOString().split('T')[0];
+
+    // Fetch all cities
+    this.cityService.getAllCities().subscribe({
+      next: (data) => {
+        this.cities = data;
+        this.filteredFromCities = data;
+        this.filteredToCities = data;
+      },
+      error: (err) => console.error('Error fetching cities', err)
+    });
+  }
+
+  // Show all cities when input is focused
+  onCityFocus(type: string): void {
+    if (type === 'from') {
+      this.filteredFromCities = this.cities;
+    } else {
+      this.filteredToCities = this.cities.filter(city => city !== this.fromCity);
+    }
+  }
+
+  // Filter cities dynamically
+  onCityInput(query: string, type: string): void {
+    if (type === 'from') {
+      this.filteredFromCities = this.cities.filter(city =>
+        city.toLowerCase().includes(query.toLowerCase())
+      );
+    } else {
+      this.filteredToCities = this.cities.filter(city =>
+        city.toLowerCase().includes(query.toLowerCase()) && city !== this.fromCity
+      );
+    }
+  }
+
+  // Select a city from the dropdown
+  selectCity(city: string, type: string): void {
+    if (type === 'from') {
+      this.fromCity = city;
+      this.filteredFromCities = [];
+      // Ensure "To City" is updated
+      this.filteredToCities = this.cities.filter(c => c !== this.fromCity);
+    } else {
+      this.toCity = city;
+      this.filteredToCities = [];
+    }
+  }
+
+  // Search button logic
+  onSearch(form: any): void {
+    if (!this.fromCity || !this.toCity || !this.departureDate) {
+      alert('Please fill in all fields correctly.');
+      return;
+    }
+
+    if (this.fromCity === this.toCity) {
+      alert('From City and To City cannot be the same.');
+      return;
+    }
+
+    console.log(`Searching flights from ${this.fromCity} to ${this.toCity} on ${this.departureDate}`);
+    // Add API call for searching flights here...
+  }
+}
+📌 Add Basic CSS (home.component.css)
+css
+Copy
+Edit
+.dropdown-menu {
+  max-height: 200px;
+  overflow-y: auto;
+  cursor: pointer;
+  position: absolute;
+  z-index: 1000;
+  background: white;
+  border: 1px solid #ddd;
+  width: 100%;
+}
+.dropdown-menu li {
+  padding: 8px;
+  list-style: none;
+}
+.dropdown-menu li:hover {
+  background-color: #f1f1f1;
+}
+🎯 Final Features
+✅ From City & To City Dropdowns
+✅ Cities Filter Dynamically as User Types
+✅ Prevent Selection of Same City for "From" and "To"
+✅ Departure Date Cannot be in the Past
+✅ Validations for Empty Fields
