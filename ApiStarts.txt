@@ -959,7 +959,66 @@ export class CityService {
 }
 ✔ Now, the API returns a list of complete City objects.
 
-3️⃣ Update home.component.ts
+✅ Updated Code: home.component.html
+html
+Copy
+Edit
+<div class="container">
+  <h2>Flight Search</h2>
+
+  <form (ngSubmit)="onSearch()" #searchForm="ngForm">
+    <!-- From City -->
+    <div class="form-group w-50">
+      <label for="fromCity">From City:</label>
+      <input type="text" id="fromCity" class="form-control" 
+        [(ngModel)]="fromCityName" name="fromCity"
+        (focus)="showFromDropdown = true"
+        (blur)="hideDropdown('from')"
+        (input)="onCityInput($event.target.value, 'from')"
+        placeholder="Enter city name" required />
+
+      <div class="dropdown-menu show" *ngIf="showFromDropdown">
+        <button *ngFor="let city of filteredFromCities" 
+          class="dropdown-item" 
+          (click)="selectCity(city, 'from')">
+          {{ city.name }} ({{ city.airportCode }})
+        </button>
+      </div>
+    </div>
+
+    <!-- To City -->
+    <div class="form-group w-50">
+      <label for="toCity">To City:</label>
+      <input type="text" id="toCity" class="form-control" 
+        [(ngModel)]="toCityName" name="toCity"
+        (focus)="showToDropdown = true"
+        (blur)="hideDropdown('to')"
+        (input)="onCityInput($event.target.value, 'to')"
+        placeholder="Enter city name" required />
+
+      <div class="dropdown-menu show" *ngIf="showToDropdown">
+        <button *ngFor="let city of filteredToCities" 
+          class="dropdown-item" 
+          (click)="selectCity(city, 'to')">
+          {{ city.name }} ({{ city.airportCode }})
+        </button>
+      </div>
+    </div>
+
+    <!-- Departure Date -->
+    <div class="form-group w-50">
+      <label for="departureDate">Departure Date:</label>
+      <input type="date" id="departureDate" class="form-control" [(ngModel)]="departureDate" name="departureDate" required min="{{ today }}" />
+    </div>
+
+    <button type="submit" class="btn btn-primary" [disabled]="!fromCity || !toCity || !departureDate">Search Flights</button>
+  </form>
+</div>
+✔ Dropdown appears only when input is focused.
+✔ Input field is not too wide (w-50 reduces width).
+✔ User can type and filter cities.
+
+✅ Updated Code: home.component.ts
 typescript
 Copy
 Edit
@@ -973,14 +1032,17 @@ import { City } from 'src/app/models/city.model';
   styleUrls: ['./home.component.css']
 })
 export class HomeComponent implements OnInit {
-  cities: City[] = []; // Store all city details
+  cities: City[] = [];
   filteredFromCities: City[] = [];
   filteredToCities: City[] = [];
   fromCity?: City;
   toCity?: City;
+  fromCityName: string = '';
+  toCityName: string = '';
   departureDate: string = '';
-
   today: string = '';
+  showFromDropdown: boolean = false;
+  showToDropdown: boolean = false;
 
   constructor(private cityService: CityService) {}
 
@@ -988,30 +1050,18 @@ export class HomeComponent implements OnInit {
     const todayDate = new Date();
     this.today = todayDate.toISOString().split('T')[0];
 
-    // Fetch all cities from API
     this.cityService.getAllCities().subscribe({
       next: (data) => {
-        this.cities = data; // Store full city details
-        this.filteredFromCities = [...this.cities];
-        this.filteredToCities = [...this.cities];
+        this.cities = data;
       },
       error: (err) => console.error('Error fetching cities', err)
     });
   }
 
-  // Show all cities when input is focused
-  onCityFocus(type: string): void {
-    if (type === 'from') {
-      this.filteredFromCities = [...this.cities];
-    } else {
-      this.filteredToCities = this.cities.filter(city => city.id !== this.fromCity?.id);
-    }
-  }
-
   // Filter cities dynamically
-  onCityInput(query: string, type: string): void {
+  onCityInput(query: string, type: 'from' | 'to'): void {
     if (!query.trim()) {
-      this.onCityFocus(type);
+      this.hideDropdown(type);
       return;
     }
 
@@ -1026,94 +1076,38 @@ export class HomeComponent implements OnInit {
     }
   }
 
-  // Select a city from the dropdown
-  selectCity(city: City, type: string): void {
+  selectCity(city: City, type: 'from' | 'to'): void {
     if (type === 'from') {
       this.fromCity = city;
-      this.filteredFromCities = [];
-      this.filteredToCities = this.cities.filter(c => c.id !== city.id);
+      this.fromCityName = city.name;
+      this.showFromDropdown = false;
     } else {
       this.toCity = city;
-      this.filteredToCities = [];
+      this.toCityName = city.name;
+      this.showToDropdown = false;
     }
   }
 
-  // Search button logic
+  hideDropdown(type: 'from' | 'to'): void {
+    setTimeout(() => {
+      if (type === 'from') this.showFromDropdown = false;
+      else this.showToDropdown = false;
+    }, 200);
+  }
+
   onSearch(): void {
     if (!this.fromCity || !this.toCity || !this.departureDate) {
-      alert('Please fill in all fields correctly.');
+      alert('Please fill all the details');
       return;
     }
 
-    if (this.fromCity.id === this.toCity.id) {
-      alert('From City and To City cannot be the same.');
-      return;
-    }
-
-    console.log(`Searching flights from ${this.fromCity.name} to ${this.toCity.name} on ${this.departureDate}`);
-    // Add API call for searching flights here...
+    console.log('Searching flights:', {
+      from: this.fromCity.name,
+      to: this.toCity.name,
+      date: this.departureDate
+    });
   }
 }
-✔ Now, fromCity and toCity store full city details, including airport code and charges.
-
-4️⃣ Update home.component.html
-html
-Copy
-Edit
-<div class="container">
-  <h2>Flight Search</h2>
-
-  <form (ngSubmit)="onSearch()" #searchForm="ngForm">
-    <!-- From City -->
-    <div class="form-group">
-      <label for="fromCity">From City:</label>
-      <input type="text" id="fromCity" class="form-control" 
-        (focus)="onCityFocus('from')" 
-        (input)="onCityInput($event.target.value, 'from')" 
-        [value]="fromCity?.name || ''" 
-        readonly />
-
-      <div class="dropdown-menu show" *ngIf="filteredFromCities.length">
-        <button *ngFor="let city of filteredFromCities" 
-          class="dropdown-item" 
-          (click)="selectCity(city, 'from')">
-          {{ city.name }} ({{ city.airportCode }})
-        </button>
-      </div>
-    </div>
-
-    <!-- To City -->
-    <div class="form-group">
-      <label for="toCity">To City:</label>
-      <input type="text" id="toCity" class="form-control" 
-        (focus)="onCityFocus('to')" 
-        (input)="onCityInput($event.target.value, 'to')" 
-        [value]="toCity?.name || ''" 
-        readonly />
-
-      <div class="dropdown-menu show" *ngIf="filteredToCities.length">
-        <button *ngFor="let city of filteredToCities" 
-          class="dropdown-item" 
-          (click)="selectCity(city, 'to')">
-          {{ city.name }} ({{ city.airportCode }})
-        </button>
-      </div>
-    </div>
-
-    <!-- Departure Date -->
-    <div class="form-group">
-      <label for="departureDate">Departure Date:</label>
-      <input type="date" id="departureDate" class="form-control" [(ngModel)]="departureDate" name="departureDate" required min="{{ today }}" />
-    </div>
-
-    <button type="submit" class="btn btn-primary" [disabled]="!fromCity || !toCity || !departureDate">Search Flights</button>
-  </form>
-</div>
-✔ Key Features:
-
-Dropdowns show all cities when focused and filter as user types.
-Clicking a dropdown selects the full city object.
-fromCity and toCity store all details (like airport code).
-Validations applied:
-fromCity ≠ toCity
-departureDate ≥ today.
+✔ Dropdown disappears when clicking outside.
+✔ Now able to type and filter cities dynamically.
+✔ Prevents onSearch() from triggering on input change.
