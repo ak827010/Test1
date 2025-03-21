@@ -959,7 +959,8 @@ export class CityService {
 }
 ✔ Now, the API returns a list of complete City objects.
 
-✅ Updated Code: home.component.html
+✅ Full Working Code
+home.component.html
 html
 Copy
 Edit
@@ -968,41 +969,43 @@ Edit
 
   <form (ngSubmit)="onSearch()" #searchForm="ngForm">
     <!-- From City -->
-    <div class="form-group w-50">
+    <div class="form-group position-relative w-50">
       <label for="fromCity">From City:</label>
       <input type="text" id="fromCity" class="form-control" 
         [(ngModel)]="fromCityName" name="fromCity"
         (focus)="showFromDropdown = true"
-        (blur)="hideDropdown('from')"
-        (input)="onCityInput($event.target.value, 'from')"
+        (input)="filterCities('from')"
+        (keydown)="onKeyDown($event, 'from')"
         placeholder="Enter city name" required />
 
-      <div class="dropdown-menu show" *ngIf="showFromDropdown">
-        <button *ngFor="let city of filteredFromCities" 
-          class="dropdown-item" 
+      <!-- Dropdown -->
+      <ul *ngIf="showFromDropdown && filteredFromCities.length" class="dropdown-menu show">
+        <li *ngFor="let city of filteredFromCities; let i = index"
+          [class.active]="i === selectedFromIndex"
           (click)="selectCity(city, 'from')">
           {{ city.name }} ({{ city.airportCode }})
-        </button>
-      </div>
+        </li>
+      </ul>
     </div>
 
     <!-- To City -->
-    <div class="form-group w-50">
+    <div class="form-group position-relative w-50">
       <label for="toCity">To City:</label>
       <input type="text" id="toCity" class="form-control" 
         [(ngModel)]="toCityName" name="toCity"
         (focus)="showToDropdown = true"
-        (blur)="hideDropdown('to')"
-        (input)="onCityInput($event.target.value, 'to')"
+        (input)="filterCities('to')"
+        (keydown)="onKeyDown($event, 'to')"
         placeholder="Enter city name" required />
 
-      <div class="dropdown-menu show" *ngIf="showToDropdown">
-        <button *ngFor="let city of filteredToCities" 
-          class="dropdown-item" 
+      <!-- Dropdown -->
+      <ul *ngIf="showToDropdown && filteredToCities.length" class="dropdown-menu show">
+        <li *ngFor="let city of filteredToCities; let i = index"
+          [class.active]="i === selectedToIndex"
           (click)="selectCity(city, 'to')">
           {{ city.name }} ({{ city.airportCode }})
-        </button>
-      </div>
+        </li>
+      </ul>
     </div>
 
     <!-- Departure Date -->
@@ -1014,11 +1017,7 @@ Edit
     <button type="submit" class="btn btn-primary" [disabled]="!fromCity || !toCity || !departureDate">Search Flights</button>
   </form>
 </div>
-✔ Dropdown appears only when input is focused.
-✔ Input field is not too wide (w-50 reduces width).
-✔ User can type and filter cities.
-
-✅ Updated Code: home.component.ts
+home.component.ts
 typescript
 Copy
 Edit
@@ -1041,14 +1040,17 @@ export class HomeComponent implements OnInit {
   toCityName: string = '';
   departureDate: string = '';
   today: string = '';
+
   showFromDropdown: boolean = false;
   showToDropdown: boolean = false;
+
+  selectedFromIndex: number = -1;
+  selectedToIndex: number = -1;
 
   constructor(private cityService: CityService) {}
 
   ngOnInit(): void {
-    const todayDate = new Date();
-    this.today = todayDate.toISOString().split('T')[0];
+    this.today = new Date().toISOString().split('T')[0];
 
     this.cityService.getAllCities().subscribe({
       next: (data) => {
@@ -1056,12 +1058,14 @@ export class HomeComponent implements OnInit {
       },
       error: (err) => console.error('Error fetching cities', err)
     });
+
+    document.addEventListener('click', this.closeDropdowns.bind(this));
   }
 
-  // Filter cities dynamically
-  onCityInput(query: string, type: 'from' | 'to'): void {
+  filterCities(type: 'from' | 'to'): void {
+    const query = type === 'from' ? this.fromCityName : this.toCityName;
     if (!query.trim()) {
-      this.hideDropdown(type);
+      this.clearSelection(type);
       return;
     }
 
@@ -1069,10 +1073,12 @@ export class HomeComponent implements OnInit {
       this.filteredFromCities = this.cities.filter(city =>
         city.name.toLowerCase().includes(query.toLowerCase())
       );
+      this.selectedFromIndex = -1;
     } else {
       this.filteredToCities = this.cities.filter(city =>
         city.name.toLowerCase().includes(query.toLowerCase()) && city.id !== this.fromCity?.id
       );
+      this.selectedToIndex = -1;
     }
   }
 
@@ -1088,11 +1094,41 @@ export class HomeComponent implements OnInit {
     }
   }
 
-  hideDropdown(type: 'from' | 'to'): void {
-    setTimeout(() => {
-      if (type === 'from') this.showFromDropdown = false;
-      else this.showToDropdown = false;
-    }, 200);
+  clearSelection(type: 'from' | 'to'): void {
+    if (type === 'from') {
+      this.filteredFromCities = [];
+      this.showFromDropdown = false;
+    } else {
+      this.filteredToCities = [];
+      this.showToDropdown = false;
+    }
+  }
+
+  closeDropdowns(event: Event): void {
+    if (!(event.target as HTMLElement).closest('.form-group')) {
+      this.showFromDropdown = false;
+      this.showToDropdown = false;
+    }
+  }
+
+  onKeyDown(event: KeyboardEvent, type: 'from' | 'to'): void {
+    let index = type === 'from' ? this.selectedFromIndex : this.selectedToIndex;
+    let list = type === 'from' ? this.filteredFromCities : this.filteredToCities;
+
+    if (event.key === 'ArrowDown' && index < list.length - 1) {
+      index++;
+    } else if (event.key === 'ArrowUp' && index > 0) {
+      index--;
+    } else if (event.key === 'Enter' && index !== -1) {
+      this.selectCity(list[index], type);
+      return;
+    }
+
+    if (type === 'from') {
+      this.selectedFromIndex = index;
+    } else {
+      this.selectedToIndex = index;
+    }
   }
 
   onSearch(): void {
@@ -1108,6 +1144,10 @@ export class HomeComponent implements OnInit {
     });
   }
 }
-✔ Dropdown disappears when clicking outside.
-✔ Now able to type and filter cities dynamically.
-✔ Prevents onSearch() from triggering on input change.
+🚀 Features Implemented
+✅ Click to open dropdown
+✅ Filter cities while typing
+✅ Click or press Enter to select a city
+✅ Arrow keys to navigate options
+✅ Dropdown closes when clicking outside
+✅ Prevents searching without filling details
