@@ -960,7 +960,7 @@ export class CityService {
 ✔ Now, the API returns a list of complete City objects.
 
 ✅ Full Working Code
-home.component.html
+🔹 home.component.html
 html
 Copy
 Edit
@@ -973,9 +973,10 @@ Edit
       <label for="fromCity">From City:</label>
       <input type="text" id="fromCity" class="form-control" 
         [(ngModel)]="fromCityName" name="fromCity"
-        (focus)="showFromDropdown = true"
+        (focus)="showDropdown('from')"
         (input)="filterCities('from')"
         (keydown)="onKeyDown($event, 'from')"
+        autocomplete="off"
         placeholder="Enter city name" required />
 
       <!-- Dropdown -->
@@ -993,9 +994,10 @@ Edit
       <label for="toCity">To City:</label>
       <input type="text" id="toCity" class="form-control" 
         [(ngModel)]="toCityName" name="toCity"
-        (focus)="showToDropdown = true"
+        (focus)="showDropdown('to')"
         (input)="filterCities('to')"
         (keydown)="onKeyDown($event, 'to')"
+        autocomplete="off"
         placeholder="Enter city name" required />
 
       <!-- Dropdown -->
@@ -1017,7 +1019,7 @@ Edit
     <button type="submit" class="btn btn-primary" [disabled]="!fromCity || !toCity || !departureDate">Search Flights</button>
   </form>
 </div>
-home.component.ts
+🔹 home.component.ts
 typescript
 Copy
 Edit
@@ -1062,10 +1064,20 @@ export class HomeComponent implements OnInit {
     document.addEventListener('click', this.closeDropdowns.bind(this));
   }
 
+  showDropdown(type: 'from' | 'to'): void {
+    if (type === 'from') {
+      this.filteredFromCities = [...this.cities];
+      this.showFromDropdown = true;
+    } else {
+      this.filteredToCities = [...this.cities.filter(city => city.id !== this.fromCity?.id)];
+      this.showToDropdown = true;
+    }
+  }
+
   filterCities(type: 'from' | 'to'): void {
     const query = type === 'from' ? this.fromCityName : this.toCityName;
     if (!query.trim()) {
-      this.clearSelection(type);
+      this.showDropdown(type);
       return;
     }
 
@@ -1094,16 +1106,6 @@ export class HomeComponent implements OnInit {
     }
   }
 
-  clearSelection(type: 'from' | 'to'): void {
-    if (type === 'from') {
-      this.filteredFromCities = [];
-      this.showFromDropdown = false;
-    } else {
-      this.filteredToCities = [];
-      this.showToDropdown = false;
-    }
-  }
-
   closeDropdowns(event: Event): void {
     if (!(event.target as HTMLElement).closest('.form-group')) {
       this.showFromDropdown = false;
@@ -1115,11 +1117,14 @@ export class HomeComponent implements OnInit {
     let index = type === 'from' ? this.selectedFromIndex : this.selectedToIndex;
     let list = type === 'from' ? this.filteredFromCities : this.filteredToCities;
 
-    if (event.key === 'ArrowDown' && index < list.length - 1) {
-      index++;
-    } else if (event.key === 'ArrowUp' && index > 0) {
-      index--;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      index = (index + 1) % list.length;
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      index = (index - 1 + list.length) % list.length;
     } else if (event.key === 'Enter' && index !== -1) {
+      event.preventDefault();
       this.selectCity(list[index], type);
       return;
     }
@@ -1144,10 +1149,10 @@ export class HomeComponent implements OnInit {
     });
   }
 }
-🚀 Features Implemented
-✅ Click to open dropdown
-✅ Filter cities while typing
-✅ Click or press Enter to select a city
-✅ Arrow keys to navigate options
-✅ Dropdown closes when clicking outside
-✅ Prevents searching without filling details
+✅ Fixes Implemented
+✔ Dropdown appears every time the user clicks the text field.
+✔ Dropdown stays open while typing and filters case-insensitively.
+✔ Dropdown disappears only when selecting a city or clicking outside.
+✔ Arrow keys (ArrowUp, ArrowDown) navigate the list.
+✔ Enter key selects the city.
+✔ If user erases input, full list reappears.
