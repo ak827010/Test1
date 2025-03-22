@@ -487,3 +487,96 @@ export class AppModule { }
 ✔ Updated Search Component (search.component.ts & search.component.html) to display results in a proper UI.
 🚀 Next Steps
 We now have a fully functional Flight Search Page! 🎉
+
+
+
+
+
+
+
+1️⃣ Modify search.component.ts
+✅ Retrieves flight data from router navigation state
+✅ If no flights are found, it shows a message
+✅ Displays flights in a neat table
+
+typescript
+Copy
+Edit
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Flight } from '../models/flight';
+
+@Component({
+  selector: 'app-search',
+  templateUrl: './search.component.html',
+  styleUrls: ['./search.component.css']
+})
+export class SearchComponent implements OnInit {
+  flights: Flight[] = [];
+
+  constructor(private router: Router, private route: ActivatedRoute) {}
+
+  ngOnInit() {
+    // Get flight data from navigation state
+    const state = history.state;
+    this.flights = state.flights || [];
+
+    if (this.flights.length === 0) {
+      alert('No flights found. Redirecting to home page.');
+      this.router.navigate(['/']); // Redirect if no flights
+    }
+  }
+
+  bookFlight(flight: Flight) {
+    alert(`Booking flight: ${flight.airline} - ${flight.flightNumber}`);
+    // Redirect to booking page if implemented
+    // this.router.navigate(['/booking'], { state: { flight } });
+  }
+}
+2️⃣ Modify search.component.html
+✅ Displays search results in a structured table
+✅ Shows "No flights found" message if the list is empty
+✅ Includes a "Book" button for each flight
+
+html
+Copy
+Edit
+<div class="container mt-4">
+  <h2>Available Flights</h2>
+
+  <div *ngIf="flights.length > 0; else noFlights">
+    <table class="table table-bordered mt-3">
+      <thead class="table-dark">
+        <tr>
+          <th>Flight Number</th>
+          <th>Airline</th>
+          <th>Departure</th>
+          <th>Arrival</th>
+          <th>Duration</th>
+          <th>Fare</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let flight of flights">
+          <td>{{ flight.flightNumber }}</td>
+          <td>{{ flight.airline }}</td>
+          <td>{{ flight.departureTime }}</td>
+          <td>{{ flight.arrivalTime }}</td>
+          <td>{{ flight.duration }}</td>
+          <td>₹{{ flight.fare }}</td>
+          <td>
+            <button class="btn btn-success" (click)="bookFlight(flight)">Book</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- No Flights Found Message -->
+  <ng-template #noFlights>
+    <p class="text-danger mt-4">No flights found. Try searching again.</p>
+  </ng-template>
+
+  <button class="btn btn-secondary mt-3" (click)="router.navigate(['/'])">Go Back</button>
+</div>
