@@ -1,0 +1,489 @@
+✅ Step 1: Update Search Component to Accept Flight Data
+The Search Component will now take flight results as input from the Home Component.
+
+🔹 search.component.ts
+typescript
+Copy
+Edit
+import { Component, Input } from '@angular/core';
+
+@Component({
+  selector: 'app-search',
+  templateUrl: './search.component.html',
+  styleUrls: ['./search.component.css']
+})
+export class SearchComponent {
+  @Input() flights: any[] = []; // Accepting flight data
+
+  constructor() { }
+
+  // Format flight duration nicely
+  getFlightDuration(departure: string, arrival: string): string {
+    const dep = new Date(departure);
+    const arr = new Date(arrival);
+    const diff = (arr.getTime() - dep.getTime()) / (1000 * 60); // Difference in minutes
+    const hours = Math.floor(diff / 60);
+    const minutes = diff % 60;
+    return `${hours}h ${minutes}m`;
+  }
+}
+✅ Step 2: Update Search Component HTML for Flight Display
+🔹 search.component.html
+html
+Copy
+Edit
+<div class="container mt-3">
+  <h3 *ngIf="flights.length > 0" class="mb-3">Available Flights</h3>
+  <div *ngIf="flights.length === 0" class="text-center">
+    <p>No flights found. Try another search.</p>
+  </div>
+
+  <div *ngFor="let flight of flights" class="flight-card">
+    <div class="flight-info">
+      <div>
+        <strong>{{ flight.airline }}</strong> <br>
+        <span>{{ flight.flightNumber }}</span>
+      </div>
+      <div>
+        <strong>{{ flight.departureTime | date:'shortTime' }}</strong> <br>
+        {{ flight.fromCity }} ({{ flight.fromAirportCode }})
+      </div>
+      <div>
+        <span class="duration">{{ getFlightDuration(flight.departureTime, flight.arrivalTime) }}</span>
+      </div>
+      <div>
+        <strong>{{ flight.arrivalTime | date:'shortTime' }}</strong> <br>
+        {{ flight.toCity }} ({{ flight.toAirportCode }})
+      </div>
+      <div class="price">
+        <strong>₹{{ flight.price }}</strong>
+      </div>
+      <button class="btn btn-primary" (click)="bookFlight(flight)">Book</button>
+    </div>
+  </div>
+</div>
+✅ Step 3: Update Styling for Better UX
+🔹 search.component.css
+css
+Copy
+Edit
+.container {
+  max-width: 800px;
+  margin: auto;
+}
+
+.flight-card {
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.flight-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.duration {
+  color: gray;
+  font-size: 14px;
+}
+
+.price {
+  font-size: 18px;
+  color: #007bff;
+}
+
+.btn {
+  margin-left: 10px;
+}
+✅ Step 4: Fetch Flight Data in Home Component
+Now we will fetch flights from the API and pass the data to the Search Component.
+
+🔹 home.component.ts
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+
+@Component({
+  selector: 'app-home',
+  templateUrl: './home.component.html',
+  styleUrls: ['./home.component.css']
+})
+export class HomeComponent {
+  fromCity = '';
+  toCity = '';
+  departureDate = '';
+  flights: any[] = []; // Store flight results
+
+  constructor(private http: HttpClient) {}
+
+  searchFlights() {
+    if (!this.fromCity || !this.toCity || !this.departureDate) {
+      alert('Please fill all fields.');
+      return;
+    }
+
+    const apiUrl = `api/flight/search?from=${this.fromCity}&to=${this.toCity}&date=${this.departureDate}`;
+    this.http.get<any[]>(apiUrl).subscribe(
+      (data) => {
+        this.flights = data;
+      },
+      (error) => {
+        console.error('Error fetching flights:', error);
+        alert('Error fetching flights.');
+      }
+    );
+  }
+}
+✅ Step 5: Update Home Component HTML to Trigger Search
+🔹 home.component.html
+html
+Copy
+Edit
+<div class="container mt-5">
+  <h2>Search Flights</h2>
+
+  <div class="form-group">
+    <label>From City</label>
+    <input type="text" [(ngModel)]="fromCity" class="form-control">
+  </div>
+
+  <div class="form-group">
+    <label>To City</label>
+    <input type="text" [(ngModel)]="toCity" class="form-control">
+  </div>
+
+  <div class="form-group">
+    <label>Departure Date</label>
+    <input type="date" [(ngModel)]="departureDate" class="form-control">
+  </div>
+
+  <button class="btn btn-primary mt-3" (click)="searchFlights()">Search Flights</button>
+
+  <app-search [flights]="flights"></app-search>
+</div>
+✅ Summary
+✔ Flight Search Flow
+1️⃣ User enters departure city, destination, and date.
+2️⃣ Clicks ‘Search Flights’ → API call is made.
+3️⃣ Flights are fetched & displayed in Search Component.
+4️⃣ User sees clean, structured flight details.
+
+🚀 Next Steps
+Now that we have Flight Search Results working: 1️⃣ Passenger Booking Form – Enter passenger details.
+2️⃣ Payment Page – Make payment & confirm booking.
+3️⃣ Booking Confirmation Page – Show booking details.
+
+🎯 Let me know what you want to build next! 🚀
+
+You said:
+What about flight service
+ChatGPT said:
+Good point! Let's create the Flight Service to handle API calls for searching flights. This will keep our code modular and clean.
+
+✅ Step 1: Create Flight Service
+This service will:
+
+Fetch available flights from the API.
+Provide an easy-to-use function for searching flights.
+🔹 Generate Flight Service (if not created)
+Run this command in the terminal:
+
+sh
+Copy
+Edit
+ng generate service services/flight
+🔹 flight.service.ts
+typescript
+Copy
+Edit
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class FlightService {
+  private apiUrl = 'http://localhost:5000/api/flight'; // Change this to your actual API
+
+  constructor(private http: HttpClient) {}
+
+  searchFlights(from: string, to: string, date: string): Observable<any[]> {
+    const url = `${this.apiUrl}/search?from=${from}&to=${to}&date=${date}`;
+    return this.http.get<any[]>(url);
+  }
+}
+✅ Step 2: Use Flight Service in Home Component
+Now, update home.component.ts to use this service instead of directly making HTTP requests.
+
+🔹 home.component.ts (Updated)
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { FlightService } from '../services/flight.service';
+
+@Component({
+  selector: 'app-home',
+  templateUrl: './home.component.html',
+  styleUrls: ['./home.component.css']
+})
+export class HomeComponent {
+  fromCity = '';
+  toCity = '';
+  departureDate = '';
+  flights: any[] = []; // Store flight results
+
+  constructor(private flightService: FlightService) {}
+
+  searchFlights() {
+    if (!this.fromCity || !this.toCity || !this.departureDate) {
+      alert('Please fill all fields.');
+      return;
+    }
+
+    this.flightService.searchFlights(this.fromCity, this.toCity, this.departureDate)
+      .subscribe(
+        (data) => {
+          this.flights = data;
+        },
+        (error) => {
+          console.error('Error fetching flights:', error);
+          alert('Error fetching flights.');
+        }
+      );
+  }
+}
+✅ Step 3: Add HttpClientModule
+Make sure HttpClientModule is imported in app.module.ts, otherwise, HTTP requests won’t work.
+
+🔹 app.module.ts
+typescript
+Copy
+Edit
+import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { HttpClientModule } from '@angular/common/http'; // Add this
+
+import { AppComponent } from './app.component';
+import { HomeComponent } from './home/home.component';
+import { SearchComponent } from './search/search.component';
+
+@NgModule({
+  declarations: [
+    AppComponent,
+    HomeComponent,
+    SearchComponent
+  ],
+  imports: [
+    BrowserModule,
+    HttpClientModule // Add this
+  ],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }
+✅ Summary
+✔ Now, the Flight Search Flow Works Like This:
+1️⃣ User enters From City, To City, and Date.
+2️⃣ Clicks Search Flights → Calls searchFlights() in HomeComponent.
+3️⃣ HomeComponent calls FlightService.searchFlights().
+4️⃣ FlightService makes an API request to fetch flights.
+5️⃣ API returns a list of flights → Displayed in the Search Component.
+
+🚀 Next Steps
+✅ We have a working Flight Search Page.
+🎯 What’s next? Do you want to proceed with:
+1️⃣ Passenger Booking Page (Enter passenger details)
+2️⃣ Flight Booking Confirmation Page
+3️⃣ Payment Page
+
+Let me know! 🚀
+
+You said:
+I have fight model in my frontend so that when API called all data of flights will be recieved
+ChatGPT said:
+Great! Since you have a Flight Model in your frontend, we should use it to ensure type safety and better data handling. Let’s integrate it properly.
+
+✅ Step 1: Define the Flight Model
+Create a flight.model.ts file inside the models folder.
+
+🔹 Generate the model file (if not created)
+Run this command in the terminal:
+
+sh
+Copy
+Edit
+ng generate interface models/flight
+🔹 flight.model.ts
+typescript
+Copy
+Edit
+export interface Flight {
+  id: number;
+  airline: string;
+  flightNumber: string;
+  fromCity: string;
+  toCity: string;
+  departureTime: string;
+  arrivalTime: string;
+  duration: string;
+  price: number;
+  availableSeats: number;
+}
+✅ Step 2: Update Flight Service
+Modify flight.service.ts to use the Flight Model.
+
+🔹 flight.service.ts (Updated)
+typescript
+Copy
+Edit
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { Flight } from '../models/flight'; // Import Flight model
+
+@Injectable({
+  providedIn: 'root'
+})
+export class FlightService {
+  private apiUrl = 'http://localhost:5000/api/flight'; // Update with your actual API URL
+
+  constructor(private http: HttpClient) {}
+
+  searchFlights(from: string, to: string, date: string): Observable<Flight[]> {
+    const url = `${this.apiUrl}/search?from=${from}&to=${to}&date=${date}`;
+    return this.http.get<Flight[]>(url); // Use Flight model
+  }
+}
+✅ Step 3: Update Home Component
+Now, modify home.component.ts to ensure it works with the Flight Model.
+
+🔹 home.component.ts (Updated)
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { FlightService } from '../services/flight.service';
+import { Flight } from '../models/flight'; // Import Flight model
+
+@Component({
+  selector: 'app-home',
+  templateUrl: './home.component.html',
+  styleUrls: ['./home.component.css']
+})
+export class HomeComponent {
+  fromCity = '';
+  toCity = '';
+  departureDate = '';
+  flights: Flight[] = []; // Use Flight model
+
+  constructor(private flightService: FlightService) {}
+
+  searchFlights() {
+    if (!this.fromCity || !this.toCity || !this.departureDate) {
+      alert('Please fill all fields.');
+      return;
+    }
+
+    this.flightService.searchFlights(this.fromCity, this.toCity, this.departureDate)
+      .subscribe(
+        (data: Flight[]) => { // Use Flight[] type
+          this.flights = data;
+        },
+        (error) => {
+          console.error('Error fetching flights:', error);
+          alert('Error fetching flights.');
+        }
+      );
+  }
+}
+✅ Step 4: Update the Search Results Component
+Modify search.component.ts to use the Flight model.
+
+🔹 search.component.ts
+typescript
+Copy
+Edit
+import { Component, Input } from '@angular/core';
+import { Flight } from '../models/flight'; // Import Flight model
+
+@Component({
+  selector: 'app-search',
+  templateUrl: './search.component.html',
+  styleUrls: ['./search.component.css']
+})
+export class SearchComponent {
+  @Input() flights: Flight[] = []; // Use Flight model
+}
+✅ Step 5: Display Flight Results in search.component.html
+Modify search.component.html to display flight details properly.
+
+🔹 search.component.html
+html
+Copy
+Edit
+<div class="container mt-4">
+  <h2>Flight Search Results</h2>
+  
+  <div *ngIf="flights.length > 0; else noFlights">
+    <div class="card mb-3" *ngFor="let flight of flights">
+      <div class="card-body">
+        <h5 class="card-title">{{ flight.airline }} - {{ flight.flightNumber }}</h5>
+        <p class="card-text">
+          <strong>From:</strong> {{ flight.fromCity }} | 
+          <strong>To:</strong> {{ flight.toCity }}
+        </p>
+        <p class="card-text">
+          <strong>Departure:</strong> {{ flight.departureTime }} |
+          <strong>Arrival:</strong> {{ flight.arrivalTime }}
+        </p>
+        <p class="card-text">
+          <strong>Duration:</strong> {{ flight.duration }} |
+          <strong>Seats Available:</strong> {{ flight.availableSeats }}
+        </p>
+        <p class="card-text">
+          <strong>Price:</strong> ₹{{ flight.price }}
+        </p>
+        <button class="btn btn-primary">Book Now</button>
+      </div>
+    </div>
+  </div>
+
+  <ng-template #noFlights>
+    <p>No flights found. Try a different search.</p>
+  </ng-template>
+</div>
+✅ Step 6: Ensure HttpClientModule is Imported
+Make sure HttpClientModule is present in app.module.ts or app.config.ts (if using standalone mode).
+
+🔹 app.module.ts
+typescript
+Copy
+Edit
+import { HttpClientModule } from '@angular/common/http';
+
+@NgModule({
+  imports: [
+    HttpClientModule // Ensure this is imported
+  ]
+})
+export class AppModule { }
+✅ Summary
+✔ Created a Flight Model (flight.model.ts) for type safety.
+✔ Updated Flight Service (flight.service.ts) to use the Flight Model.
+✔ Updated Home Component (home.component.ts) to fetch and store flights properly.
+✔ Updated Search Component (search.component.ts & search.component.html) to display results in a proper UI.
+🚀 Next Steps
+We now have a fully functional Flight Search Page! 🎉
