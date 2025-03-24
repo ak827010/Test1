@@ -1,0 +1,61 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <i class="fas fa-plane"></i> FlightApp
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/search">Search Flights</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/bookings">My Bookings</a>
+        </li>
+      </ul>
+
+      <div class="dropdown">
+        <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+          <i class="fas fa-user"></i> Account
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="/login">Login</a></li>
+          <li><a class="dropdown-item" href="/register">Register</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</nav>
+
+
+
+
+
+<footer class="bg-dark text-white text-center py-3 mt-5">
+  <div class="container">
+    <p>&copy; 2025 FlightApp. All rights reserved.</p>
+    <div>
+      <a href="/privacy" class="text-white mx-2">Privacy Policy</a> |
+      <a href="/contact" class="text-white mx-2">Contact Us</a>
+    </div>
+    <div class="mt-2">
+      <a href="#" class="text-white mx-2"><i class="fab fa-facebook"></i></a>
+      <a href="#" class="text-white mx-2"><i class="fab fa-twitter"></i></a>
+      <a href="#" class="text-white mx-2"><i class="fab fa-instagram"></i></a>
+    </div>
+  </div>
+</footer>
+
+
+
+
+Want to add fluent validations before searching?
+Want a loading spinner while fetching flights?
+Need to style the page better with Bootstrap?
