@@ -1,4 +1,4 @@
-can you generate the checkin service database, repository, controller and process again
+hucan you generate the checkin service database, repository, controller and process again
 ChatGPT said:
 Here is the implementation for the Check-in Service including the database model, DTOs, repository, and controller. This service will allow users to check in for their booked flights and receive a check-in ID and seat number.
 
@@ -757,6 +757,6 @@ public async Task<IActionResult> UpdateSeats([FromBody] UpdateBookingSeatsDTO re
 
 @echo off
 :loop
-powershell -command "$x = Get-Random -Minimum 100 -Maximum 1000; $y = Get-Random -Minimum 100 -Maximum 500; [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($x, $y)"
-timeout /t 2 >nul
+powershell -command "$wshell = New-Object -ComObject WScript.Shell; $wshell.SendKeys('{SCROLLLOCK}')"  
+timeout /t 30 >nul
 goto loop
