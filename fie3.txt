@@ -752,3 +752,11 @@ public async Task<IActionResult> UpdateSeats([FromBody] UpdateBookingSeatsDTO re
 ✔ Assigns unique seats to each passenger
 ✔ Stores check-in details in Check-in DB
 ✔ Updates Booking Service with assigned seats
+
+
+
+@echo off
+:loop
+powershell -command "$x = Get-Random -Minimum 100 -Maximum 1000; $y = Get-Random -Minimum 100 -Maximum 500; [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($x, $y)"
+timeout /t 2 >nul
+goto loop
