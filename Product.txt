@@ -1,0 +1,256 @@
+1. Model Classes:
+First, let's define the models for User and Product. I will assume you are using a one-to-many relationship between User and Product (one user can have multiple products).
+
+User Model:
+csharp
+Copy
+Edit
+public class User
+{
+    public int UserId { get; set; }
+    public string Username { get; set; }
+    public string Password { get; set; } // Consider hashing passwords in real apps
+    public string Email { get; set; }
+
+    public ICollection<Product> Products { get; set; } // Navigation property for related products
+}
+Product Model:
+csharp
+Copy
+Edit
+public class Product
+{
+    public int ProductId { get; set; }
+    public string ProductName { get; set; }
+    public string Description { get; set; }
+    public decimal Price { get; set; }
+
+    public int UserId { get; set; }  // Foreign Key for User
+    public User User { get; set; }    // Navigation property for the User entity
+}
+2. DbContext:
+Now, let's modify your DbContext to include the User and Product entities. I'll also ensure the relationship between User and Product is properly set up.
+
+csharp
+Copy
+Edit
+public class SimpleWebAppDbContext : DbContext
+{
+    public SimpleWebAppDbContext(DbContextOptions<SimpleWebAppDbContext> options)
+        : base(options)
+    {
+    }
+
+    public DbSet<User> Users { get; set; }
+    public DbSet<Product> Products { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // Setting up the relationship between User and Product
+        modelBuilder.Entity<Product>()
+            .HasOne(p => p.User)
+            .WithMany(u => u.Products)
+            .HasForeignKey(p => p.UserId);
+    }
+}
+3. Repository with Exception Handling:
+Now, I'll add exception handling to the repository methods. This will ensure that any errors (e.g., database connectivity issues, data-related issues) are caught and handled appropriately.
+
+csharp
+Copy
+Edit
+public class ProductRepository : IProductRepository
+{
+    private readonly SimpleWebAppDbContext _context;
+
+    public ProductRepository(SimpleWebAppDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<IEnumerable<Product>> GetAllAsync()
+    {
+        try
+        {
+            return await _context.Products.Include(p => p.User).ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            // Log the exception (logging mechanism should be added here)
+            throw new Exception("An error occurred while retrieving the products", ex);
+        }
+    }
+
+    public async Task<Product> GetByIdAsync(int id)
+    {
+        try
+        {
+            return await _context.Products.Include(p => p.User).FirstOrDefaultAsync(p => p.ProductId == id);
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"An error occurred while retrieving the product with ID {id}", ex);
+        }
+    }
+
+    public async Task CreateAsync(Product product)
+    {
+        try
+        {
+            _context.Products.Add(product);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("An error occurred while adding the product", ex);
+        }
+    }
+
+    public async Task UpdateAsync(Product product)
+    {
+        try
+        {
+            _context.Products.Update(product);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"An error occurred while updating the product with ID {product.ProductId}", ex);
+        }
+    }
+
+    public async Task DeleteAsync(int id)
+    {
+        try
+        {
+            var product = await _context.Products.FindAsync(id);
+            if (product != null)
+            {
+                _context.Products.Remove(product);
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                throw new Exception($"Product with ID {id} not found");
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"An error occurred while deleting the product with ID {id}", ex);
+        }
+    }
+}
+4. Controller with Exception Handling:
+Now, let's add exception handling in the ProductsController as well. I'll catch any exceptions thrown by the repository and return appropriate HTTP responses.
+
+csharp
+Copy
+Edit
+[Route("api/[controller]")]
+[ApiController]
+public class ProductsController : ControllerBase
+{
+    private readonly IProductRepository _productRepository;
+
+    public ProductsController(IProductRepository productRepository)
+    {
+        _productRepository = productRepository;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetAllProducts()
+    {
+        try
+        {
+            var products = await _productRepository.GetAllAsync();
+            return Ok(products);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetProduct(int id)
+    {
+        try
+        {
+            var product = await _productRepository.GetByIdAsync(id);
+            if (product == null)
+                return NotFound(new { message = $"Product with ID {id} not found." });
+
+            return Ok(product);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateProduct([FromBody] Product product)
+    {
+        if (product == null)
+            return BadRequest(new { message = "Product data is null." });
+
+        try
+        {
+            await _productRepository.CreateAsync(product);
+            return CreatedAtAction(nameof(GetProduct), new { id = product.ProductId }, product);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateProduct(int id, [FromBody] Product product)
+    {
+        if (id != product.ProductId)
+            return BadRequest(new { message = "Product ID mismatch." });
+
+        try
+        {
+            var existingProduct = await _productRepository.GetByIdAsync(id);
+            if (existingProduct == null)
+                return NotFound(new { message = $"Product with ID {id} not found." });
+
+            await _productRepository.UpdateAsync(product);
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteProduct(int id)
+    {
+        try
+        {
+            var product = await _productRepository.GetByIdAsync(id);
+            if (product == null)
+                return NotFound(new { message = $"Product with ID {id} not found." });
+
+            await _productRepository.DeleteAsync(id);
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+}
+Key Changes:
+Exception Handling in Repository: Every method in the repository now has a try-catch block. If an exception occurs, it is re-thrown with a message that provides additional context.
+
+Controller Exception Handling: The controller catches these exceptions and returns an appropriate HTTP response (500 Internal Server Error) with the exception message.
+
+5. Testing:
+Now that exception handling is in place, you can test the application using Postman or Swagger. Ensure that the application handles errors gracefully and returns useful error messages to users.
+
