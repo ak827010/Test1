@@ -1,202 +1,415 @@
-Here's the Final Correct UserRepository.cs
-csharp
-Copy
-Edit
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
-using SimpleWebApp.Models; // Adjust namespace based on your structure
-using System;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
+using SimpleWebApp.Controllers;
+using SimpleWebApp.Models;
+using SimpleWebApp.Repositories;
+using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 
-namespace SimpleWebApp.Repositories
+namespace SimpleWebApp.Tests.Controllers
 {
-    public interface IUserRepository
+    [TestClass]
+    public class UserControllerTests
     {
-        Task<User> RegisterAsync(User user);
-        Task<string> LoginAsync(string username, string password);
+        private Mock<IUserRepository> _userRepoMock;
+        private UserController _userController;
+
+        [TestInitialize]
+        public void Setup()
+        {
+            _userRepoMock = new Mock<IUserRepository>();
+            _userController = new UserController(_userRepoMock.Object);
+        }
+
+        [TestMethod]
+        public async Task Register_ShouldReturnOk_WhenUserRegistered()
+        {
+            // Positive case
+            var user = new User { Username = "test", Password = "1234", Email = "test@test.com" };
+            _userRepoMock.Setup(repo => repo.Register(user)).ReturnsAsync(true);
+
+            var result = await _userController.Register(user) as OkObjectResult;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(200, result.StatusCode);
+        }
+
+        [TestMethod]
+        public async Task Register_ShouldReturnBadRequest_WhenRegistrationFails()
+        {
+            // Negative case
+            var user = new User { Username = "test", Password = "1234", Email = "test@test.com" };
+            _userRepoMock.Setup(repo => repo.Register(user)).ReturnsAsync(false);
+
+            var result = await _userController.Register(user) as BadRequestObjectResult;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(400, result.StatusCode);
+        }
+
+        [TestMethod]
+        public async Task Login_ShouldReturnToken_WhenCredentialsAreValid()
+        {
+            // Positive case
+            var loginModel = new LoginModel { Username = "test", Password = "1234" };
+            _userRepoMock.Setup(repo => repo.Login(loginModel)).ReturnsAsync("mocked-token");
+
+            var result = await _userController.Login(loginModel) as OkObjectResult;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(200, result.StatusCode);
+            Assert.AreEqual("mocked-token", (result.Value as dynamic)?.token);
+        }
+
+        [TestMethod]
+        public async Task Login_ShouldReturnUnauthorized_WhenInvalidCredentials()
+        {
+            // Negative case
+            var loginModel = new LoginModel { Username = "wrong", Password = "wrong" };
+            _userRepoMock.Setup(repo => repo.Login(loginModel)).ReturnsAsync((string)null);
+
+            var result = await _userController.Login(loginModel) as UnauthorizedResult;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(401, result.StatusCode);
+        }
     }
+}
 
-    public class UserRepository : IUserRepository
+
+
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
+using SimpleWebApp.Controllers;
+using SimpleWebApp.Models;
+using SimpleWebApp.Repositories;
+using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace SimpleWebApp.Tests.Controllers
+{
+    [TestClass]
+    public class ProductControllerTests
     {
-        private readonly SimpleWebAppDBContext _context;
-        private readonly IConfiguration _configuration;
+        private Mock<IProductRepository> _productRepoMock;
+        private ProductController _productController;
 
-        public UserRepository(SimpleWebAppDBContext context, IConfiguration configuration)
+        [TestInitialize]
+        public void Setup()
         {
-            _context = context;
-            _configuration = configuration;
+            _productRepoMock = new Mock<IProductRepository>();
+            _productController = new ProductController(_productRepoMock.Object);
         }
 
-        // Register a new user
-        public async Task<User> RegisterAsync(User user)
+        [TestMethod]
+        public async Task GetAllProducts_ShouldReturnListOfProducts()
         {
-            // Check if username already exists
-            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Username == user.Username);
-            if (existingUser != null)
+            // Positive
+            var products = new List<Product>
             {
-                throw new Exception("Username already taken.");
-            }
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-            return user;
-        }
-
-        // Login and generate JWT Token
-        public async Task<string> LoginAsync(string username, string password)
-        {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == username && u.Password == password);
-            if (user == null)
-            {
-                throw new Exception("Invalid username or password.");
-            }
-
-            // If login successful, generate token
-            return GenerateJwtToken(user);
-        }
-
-        private string GenerateJwtToken(User user)
-        {
-            var jwtSettings = _configuration.GetSection("JwtSettings");
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]));
-            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Email, user.Email ?? "")
+                new Product { ProductId = 1, ProductName = "Product A" },
+                new Product { ProductId = 2, ProductName = "Product B" }
             };
+            _productRepoMock.Setup(repo => repo.GetAllProducts()).ReturnsAsync(products);
 
-            var token = new JwtSecurityToken(
-                issuer: jwtSettings["Issuer"],
-                audience: jwtSettings["Audience"],
-                claims: claims,
-                expires: DateTime.Now.AddHours(1),
-                signingCredentials: credentials
-            );
+            var result = await _productController.GetAllProducts() as OkObjectResult;
 
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            Assert.IsNotNull(result);
+            Assert.AreEqual(2, (result.Value as List<Product>).Count);
+        }
+
+        [TestMethod]
+        public async Task GetAllProducts_ShouldReturnEmptyList_WhenNoProducts()
+        {
+            // Negative
+            _productRepoMock.Setup(repo => repo.GetAllProducts()).ReturnsAsync(new List<Product>());
+
+            var result = await _productController.GetAllProducts() as OkObjectResult;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(0, (result.Value as List<Product>).Count);
+        }
+
+        [TestMethod]
+        public async Task GetProductById_ShouldReturnProduct_WhenProductExists()
+        {
+            // Positive
+            var product = new Product { ProductId = 1, ProductName = "Product A" };
+            _productRepoMock.Setup(repo => repo.GetProductById(1)).ReturnsAsync(product);
+
+            var result = await _productController.GetProductById(1) as OkObjectResult;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual("Product A", (result.Value as Product).ProductName);
+        }
+
+        [TestMethod]
+        public async Task GetProductById_ShouldReturnNotFound_WhenProductDoesNotExist()
+        {
+            // Negative
+            _productRepoMock.Setup(repo => repo.GetProductById(99)).ReturnsAsync((Product)null);
+
+            var result = await _productController.GetProductById(99) as NotFoundObjectResult;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(404, result.StatusCode);
+        }
+
+        [TestMethod]
+        public async Task AddProduct_ShouldReturnOk_WhenProductAdded()
+        {
+            // Positive
+            var product = new Product { ProductName = "New Product" };
+            _productRepoMock.Setup(repo => repo.AddProduct(product)).ReturnsAsync(true);
+
+            var result = await _productController.AddProduct(product) as OkObjectResult;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(200, result.StatusCode);
+        }
+
+        [TestMethod]
+        public async Task AddProduct_ShouldReturnBadRequest_WhenAddFails()
+        {
+            // Negative
+            var product = new Product { ProductName = "New Product" };
+            _productRepoMock.Setup(repo => repo.AddProduct(product)).ReturnsAsync(false);
+
+            var result = await _productController.AddProduct(product) as BadRequestObjectResult;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(400, result.StatusCode);
+        }
+
+        [TestMethod]
+        public async Task UpdateProduct_ShouldReturnOk_WhenProductUpdated()
+        {
+            // Positive
+            var product = new Product { ProductId = 1, ProductName = "Updated Product" };
+            _productRepoMock.Setup(repo => repo.UpdateProduct(product)).ReturnsAsync(true);
+
+            var result = await _productController.UpdateProduct(product) as OkObjectResult;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(200, result.StatusCode);
+        }
+
+        [TestMethod]
+        public async Task UpdateProduct_ShouldReturnBadRequest_WhenUpdateFails()
+        {
+            // Negative
+            var product = new Product { ProductId = 99, ProductName = "Nonexistent Product" };
+            _productRepoMock.Setup(repo => repo.UpdateProduct(product)).ReturnsAsync(false);
+
+            var result = await _productController.UpdateProduct(product) as BadRequestObjectResult;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(400, result.StatusCode);
+        }
+
+        [TestMethod]
+        public async Task DeleteProduct_ShouldReturnOk_WhenProductDeleted()
+        {
+            // Positive
+            _productRepoMock.Setup(repo => repo.DeleteProduct(1)).ReturnsAsync(true);
+
+            var result = await _productController.DeleteProduct(1) as OkObjectResult;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(200, result.StatusCode);
+        }
+
+        [TestMethod]
+        public async Task DeleteProduct_ShouldReturnBadRequest_WhenDeleteFails()
+        {
+            // Negative
+            _productRepoMock.Setup(repo => repo.DeleteProduct(99)).ReturnsAsync(false);
+
+            var result = await _productController.DeleteProduct(99) as BadRequestObjectResult;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(400, result.StatusCode);
         }
     }
 }
-⚙️ Things this Repository Does:
 
-Feature	Covered
-User Registration	✅
-Check if username is already taken	✅
-User Login with Username and Password	✅
-Generate JWT Token if login is successful	✅
-Token contains UserId, Username, Email	✅
-No password hashing (plain password check)	✅
-🛠 Now, How you connect this Repository
-Register the Repository in Startup.cs or Program.cs:
 
-csharp
-Copy
-Edit
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-Create a UserController.cs to call these methods.
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
+using SimpleWebApp.Controllers;
+using SimpleWebApp.Models;
+using SimpleWebApp.Repositories;
+using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
 
-Example:
-
-csharp
-Copy
-Edit
-[Route("api/[controller]")]
-[ApiController]
-public class UserController : ControllerBase
+namespace SimpleWebApp.Tests.Controllers
 {
-    private readonly IUserRepository _userRepository;
-
-    public UserController(IUserRepository userRepository)
+    [TestClass]
+    public class UserControllerTests
     {
-        _userRepository = userRepository;
-    }
+        private Mock<IUserRepository> _userRepoMock;
+        private UserController _userController;
 
-    [HttpPost("register")]
-    [AllowAnonymous]
-    public async Task<IActionResult> Register(User user)
-    {
-        try
+        [TestInitialize]
+        public void Setup()
         {
-            var registeredUser = await _userRepository.RegisterAsync(user);
-            return Ok(registeredUser);
+            _userRepoMock = new Mock<IUserRepository>();
+            _userController = new UserController(_userRepoMock.Object);
         }
-        catch (Exception ex)
-        {
-            return BadRequest(ex.Message);
-        }
-    }
 
-    [HttpPost("login")]
-    [AllowAnonymous]
-    public async Task<IActionResult> Login([FromBody] LoginRequest model)
-    {
-        try
+        [TestMethod]
+        public async Task Register_ShouldReturnOk_WhenUserRegistered()
         {
-            var token = await _userRepository.LoginAsync(model.Username, model.Password);
-            return Ok(new { Token = token });
+            // Arrange
+            var user = new User { Username = "test", Password = "1234", Email = "test@test.com" };
+            _userRepoMock.Setup(repo => repo.Register(user)).ReturnsAsync(true);
+
+            // Act
+            var result = await _userController.Register(user) as OkObjectResult;
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(200, result.StatusCode);
         }
-        catch (Exception ex)
+
+        [TestMethod]
+        public async Task Login_ShouldReturnToken_WhenCredentialsAreValid()
         {
-            return Unauthorized(ex.Message);
+            // Arrange
+            var loginModel = new LoginModel { Username = "test", Password = "1234" };
+            _userRepoMock.Setup(repo => repo.Login(loginModel)).ReturnsAsync("mocked-token");
+
+            // Act
+            var result = await _userController.Login(loginModel) as OkObjectResult;
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(200, result.StatusCode);
+            Assert.AreEqual("mocked-token", (result.Value as dynamic)?.token);
+        }
+
+        [TestMethod]
+        public async Task Login_ShouldReturnUnauthorized_WhenInvalidCredentials()
+        {
+            // Arrange
+            var loginModel = new LoginModel { Username = "wrong", Password = "wrong" };
+            _userRepoMock.Setup(repo => repo.Login(loginModel)).ReturnsAsync((string)null);
+
+            // Act
+            var result = await _userController.Login(loginModel) as UnauthorizedResult;
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(401, result.StatusCode);
         }
     }
 }
-✔️ LoginRequest is a simple DTO:
 
-csharp
-Copy
-Edit
-public class LoginRequest
-{
-    public string Username { get; set; }
-    public string Password { get; set; }
-}
-🧠 Important AppSettings (appsettings.json)
-json
-Copy
-Edit
-"JwtSettings": {
-  "Key": "ThisIsASecretKeyForJwtToken", 
-  "Issuer": "SimpleWebApp",
-  "Audience": "SimpleWebAppUsers"
-}
-✅ Make sure the Key is at least 16 characters for HMAC.
 
-🛡 JWT Authentication Middleware (Program.cs)
-csharp
-Copy
-Edit
-var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 
-builder.Services.AddAuthentication(options =>
+
+
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
+using SimpleWebApp.Controllers;
+using SimpleWebApp.Models;
+using SimpleWebApp.Repositories;
+using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace SimpleWebApp.Tests.Controllers
 {
-    options.DefaultAuthenticateScheme = "JwtBearer";
-    options.DefaultChallengeScheme = "JwtBearer";
-})
-.AddJwtBearer("JwtBearer", options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
+    [TestClass]
+    public class ProductControllerTests
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSettings["Issuer"],
-        ValidAudience = jwtSettings["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]))
-    };
-});
+        private Mock<IProductRepository> _productRepoMock;
+        private ProductController _productController;
 
-builder.Services.AddAuthorization();
+        [TestInitialize]
+        public void Setup()
+        {
+            _productRepoMock = new Mock<IProductRepository>();
+            _productController = new ProductController(_productRepoMock.Object);
+        }
 
-var app = builder.Build();
+        [TestMethod]
+        public async Task GetAllProducts_ShouldReturnListOfProducts()
+        {
+            // Arrange
+            var products = new List<Product>
+            {
+                new Product { ProductId = 1, ProductName = "Product A" },
+                new Product { ProductId = 2, ProductName = "Product B" }
+            };
+            _productRepoMock.Setup(repo => repo.GetAllProducts()).ReturnsAsync(products);
 
-app.UseAuthentication();
-app.UseAuthorization();
+            // Act
+            var result = await _productController.GetAllProducts() as OkObjectResult;
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(2, (result.Value as List<Product>).Count);
+        }
+
+        [TestMethod]
+        public async Task GetProductById_ShouldReturnProduct_WhenProductExists()
+        {
+            // Arrange
+            var product = new Product { ProductId = 1, ProductName = "Product A" };
+            _productRepoMock.Setup(repo => repo.GetProductById(1)).ReturnsAsync(product);
+
+            // Act
+            var result = await _productController.GetProductById(1) as OkObjectResult;
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual("Product A", (result.Value as Product).ProductName);
+        }
+
+        [TestMethod]
+        public async Task AddProduct_ShouldReturnOk_WhenProductAdded()
+        {
+            // Arrange
+            var product = new Product { ProductName = "New Product" };
+            _productRepoMock.Setup(repo => repo.AddProduct(product)).ReturnsAsync(true);
+
+            // Act
+            var result = await _productController.AddProduct(product) as OkObjectResult;
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(200, result.StatusCode);
+        }
+
+        [TestMethod]
+        public async Task UpdateProduct_ShouldReturnOk_WhenProductUpdated()
+        {
+            // Arrange
+            var product = new Product { ProductId = 1, ProductName = "Updated Product" };
+            _productRepoMock.Setup(repo => repo.UpdateProduct(product)).ReturnsAsync(true);
+
+            // Act
+            var result = await _productController.UpdateProduct(product) as OkObjectResult;
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(200, result.StatusCode);
+        }
+
+        [TestMethod]
+        public async Task DeleteProduct_ShouldReturnOk_WhenProductDeleted()
+        {
+            // Arrange
+            _productRepoMock.Setup(repo => repo.DeleteProduct(1)).ReturnsAsync(true);
+
+            // Act
+            var result = await _productController.DeleteProduct(1) as OkObjectResult;
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(200, result.StatusCode);
+        }
+    }
+}
