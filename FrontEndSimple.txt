@@ -1,0 +1,412 @@
+✨ 2. Components
+a. login.component.ts
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { HttpClientModule } from '@angular/common/http';
+
+@Component({
+  selector: 'app-login',
+  standalone: true,
+  imports: [CommonModule, FormsModule, HttpClientModule],
+  templateUrl: './login.component.html'
+})
+export class LoginComponent {
+  model: any = {};
+
+  constructor(private authService: AuthService, private router: Router) {}
+
+  login() {
+    this.authService.login(this.model).subscribe({
+      next: (res: any) => {
+        localStorage.setItem('token', res.token);
+        this.router.navigate(['/products']);
+      },
+      error: () => {
+        alert('Invalid credentials!');
+      }
+    });
+  }
+}
+b. login.component.html
+html
+Copy
+Edit
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-4">
+      <h3>Login</h3>
+      <form (ngSubmit)="login()">
+        <div class="form-group mb-3">
+          <label>Username</label>
+          <input type="text" class="form-control" [(ngModel)]="model.username" name="username" required>
+        </div>
+        <div class="form-group mb-3">
+          <label>Password</label>
+          <input type="password" class="form-control" [(ngModel)]="model.password" name="password" required>
+        </div>
+        <button class="btn btn-primary w-100">Login</button>
+      </form>
+      <p class="mt-3">Don't have an account? <a routerLink="/register">Register</a></p>
+    </div>
+  </div>
+</div>
+c. register.component.ts
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { HttpClientModule } from '@angular/common/http';
+
+@Component({
+  selector: 'app-register',
+  standalone: true,
+  imports: [CommonModule, FormsModule, HttpClientModule],
+  templateUrl: './register.component.html'
+})
+export class RegisterComponent {
+  model: any = {};
+
+  constructor(private authService: AuthService, private router: Router) {}
+
+  register() {
+    this.authService.register(this.model).subscribe({
+      next: () => {
+        alert('Registration Successful! Please login.');
+        this.router.navigate(['/login']);
+      },
+      error: () => {
+        alert('Registration Failed!');
+      }
+    });
+  }
+}
+d. register.component.html
+html
+Copy
+Edit
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-4">
+      <h3>Register</h3>
+      <form (ngSubmit)="register()">
+        <div class="form-group mb-3">
+          <label>Username</label>
+          <input type="text" class="form-control" [(ngModel)]="model.username" name="username" required>
+        </div>
+        <div class="form-group mb-3">
+          <label>Password</label>
+          <input type="password" class="form-control" [(ngModel)]="model.password" name="password" required>
+        </div>
+        <div class="form-group mb-3">
+          <label>Email</label>
+          <input type="email" class="form-control" [(ngModel)]="model.email" name="email" required>
+        </div>
+        <button class="btn btn-success w-100">Register</button>
+      </form>
+      <p class="mt-3">Already have an account? <a routerLink="/login">Login</a></p>
+    </div>
+  </div>
+</div>
+e. product-list.component.ts
+typescript
+Copy
+Edit
+import { Component, OnInit } from '@angular/core';
+import { ProductService } from '../../services/product.service';
+import { Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { HttpClientModule } from '@angular/common/http';
+
+@Component({
+  selector: 'app-product-list',
+  standalone: true,
+  imports: [CommonModule, HttpClientModule],
+  templateUrl: './product-list.component.html'
+})
+export class ProductListComponent implements OnInit {
+  products: any[] = [];
+
+  constructor(private productService: ProductService, private router: Router) {}
+
+  ngOnInit() {
+    this.loadProducts();
+  }
+
+  loadProducts() {
+    this.productService.getProducts().subscribe(res => {
+      this.products = res;
+    });
+  }
+
+  deleteProduct(id: number) {
+    if (confirm('Are you sure to delete?')) {
+      this.productService.deleteProduct(id).subscribe(() => {
+        this.loadProducts();
+      });
+    }
+  }
+
+  logout() {
+    localStorage.removeItem('token');
+    this.router.navigate(['/login']);
+  }
+}
+f. product-list.component.html
+html
+Copy
+Edit
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Products</h3>
+    <button class="btn btn-danger" (click)="logout()">Logout</button>
+  </div>
+
+  <button class="btn btn-success mb-3" routerLink="/products/add">Add Product</button>
+
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+        <th>Price</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let product of products">
+        <td>{{ product.productName }}</td>
+        <td>{{ product.description }}</td>
+        <td>{{ product.price | currency }}</td>
+        <td>
+          <button class="btn btn-primary btn-sm" [routerLink]="['/products/edit', product.productId]">Edit</button>
+          <button class="btn btn-danger btn-sm ms-2" (click)="deleteProduct(product.productId)">Delete</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+g. add-product.component.ts
+typescript
+Copy
+Edit
+import { Component } from '@angular/core';
+import { ProductService } from '../../services/product.service';
+import { Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { HttpClientModule } from '@angular/common/http';
+
+@Component({
+  selector: 'app-add-product',
+  standalone: true,
+  imports: [CommonModule, FormsModule, HttpClientModule],
+  templateUrl: './add-product.component.html'
+})
+export class AddProductComponent {
+  model: any = {};
+
+  constructor(private productService: ProductService, private router: Router) {}
+
+  addProduct() {
+    this.productService.addProduct(this.model).subscribe(() => {
+      this.router.navigate(['/products']);
+    });
+  }
+}
+h. add-product.component.html
+html
+Copy
+Edit
+<div class="container mt-4">
+  <h3>Add Product</h3>
+  <form (ngSubmit)="addProduct()">
+    <div class="form-group mb-3">
+      <label>Product Name</label>
+      <input type="text" class="form-control" [(ngModel)]="model.productName" name="productName" required>
+    </div>
+    <div class="form-group mb-3">
+      <label>Description</label>
+      <textarea class="form-control" [(ngModel)]="model.description" name="description" required></textarea>
+    </div>
+    <div class="form-group mb-3">
+      <label>Price</label>
+      <input type="number" class="form-control" [(ngModel)]="model.price" name="price" required>
+    </div>
+    <button class="btn btn-success w-100">Add Product</button>
+  </form>
+</div>
+i. edit-product.component.ts
+typescript
+Copy
+Edit
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { ProductService } from '../../services/product.service';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { HttpClientModule } from '@angular/common/http';
+
+@Component({
+  selector: 'app-edit-product',
+  standalone: true,
+  imports: [CommonModule, FormsModule, HttpClientModule],
+  templateUrl: './edit-product.component.html'
+})
+export class EditProductComponent implements OnInit {
+  model: any = {};
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private productService: ProductService
+  ) {}
+
+  ngOnInit() {
+    const id = Number(this.route.snapshot.paramMap.get('id'));
+    this.productService.getProductById(id).subscribe(res => {
+      this.model = res;
+    });
+  }
+
+  updateProduct() {
+    this.productService.updateProduct(this.model.productId, this.model).subscribe(() => {
+      this.router.navigate(['/products']);
+    });
+  }
+}
+j. edit-product.component.html
+html
+Copy
+Edit
+<div class="container mt-4">
+  <h3>Edit Product</h3>
+  <form (ngSubmit)="updateProduct()">
+    <div class="form-group mb-3">
+      <label>Product Name</label>
+      <input type="text" class="form-control" [(ngModel)]="model.productName" name="productName" required>
+    </div>
+    <div class="form-group mb-3">
+      <label>Description</label>
+      <textarea class="form-control" [(ngModel)]="model.description" name="description" required></textarea>
+    </div>
+    <div class="form-group mb-3">
+      <label>Price</label>
+      <input type="number" class="form-control" [(ngModel)]="model.price" name="price" required>
+    </div>
+    <button class="btn btn-primary w-100">Update Product</button>
+  </form>
+</div>
+✨ 3. Services
+auth.service.ts
+typescript
+Copy
+Edit
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+@Injectable({ providedIn: 'root' })
+export class AuthService {
+  private apiUrl = 'https://localhost:7295/api/User'; // your backend URL
+
+  constructor(private http: HttpClient) {}
+
+  login(model: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/login`, model);
+  }
+
+  register(model: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/register`, model);
+  }
+}
+product.service.ts
+typescript
+Copy
+Edit
+import { Injectable } from '@angular/core';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+@Injectable({ providedIn: 'root' })
+export class ProductService {
+  private apiUrl = 'https://localhost:7295/api/Product';
+
+  constructor(private http: HttpClient) {}
+
+  private getHeaders() {
+    const token = localStorage.getItem('token');
+    return {
+      headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
+    };
+  }
+
+  getProducts(): Observable<any[]> {
+    return this.http.get<any[]>(this.apiUrl, this.getHeaders());
+  }
+
+  getProductById(id: number): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/${id}`, this.getHeaders());
+  }
+
+  addProduct(product: any): Observable<any> {
+    return this.http.post(this.apiUrl, product, this.getHeaders());
+  }
+
+  updateProduct(id: number, product: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/${id}`, product, this.getHeaders());
+  }
+
+  deleteProduct(id: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/${id}`, this.getHeaders());
+  }
+}
+✨ 4. Routing & Guard
+app.routes.ts
+typescript
+Copy
+Edit
+import { Routes } from '@angular/router';
+import { LoginComponent } from './components/login/login.component';
+import { RegisterComponent } from './components/register/register.component';
+import { ProductListComponent } from './components/product-list/product-list.component';
+import { AddProductComponent } from './components/add-product/add-product.component';
+import { EditProductComponent } from './components/edit-product/edit-product.component';
+import { inject } from '@angular/core';
+import { authGuard } from './guards/auth.guard';
+import { Router } from '@angular/router';
+
+export const appRoutes: Routes = [
+  { path: '', redirectTo: 'login', pathMatch: 'full' },
+  { path: 'login', component: LoginComponent },
+  { path: 'register', component: RegisterComponent },
+  { path: 'products', component: ProductListComponent, canActivate: [() => authGuard(inject(Router))] },
+  { path: 'products/add', component: AddProductComponent, canActivate: [() => authGuard(inject(Router))] },
+  { path: 'products/edit/:id', component: EditProductComponent, canActivate: [() => authGuard(inject(Router))] },
+];
+auth.guard.ts
+typescript
+Copy
+Edit
+import { CanActivateFn, Router } from '@angular/router';
+
+export function authGuard(router: Router): CanActivateFn {
+  return () => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      return true;
+    } else {
+      router.navigate(['/login']);
+      return false;
+    }
+  };
+}
